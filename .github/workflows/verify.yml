@@ -1,0 +1,20 @@
+name: Verify Tambay
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check dist/app.js
+          node --check api/search.js
+          node --check dist/sw.js
+      - name: Run smoke tests
+        run: node test.cjs
