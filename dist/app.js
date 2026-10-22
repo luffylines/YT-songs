@@ -27,14 +27,16 @@ function addSong(song) { if(!state.songs.some(s=>s.id===song.id))state.songs.pus
 function setView(next) { view=next;query='';$('query').value='';searchResults=null;requestVersion++;status('');render(); showSectionView(); }
 function showSectionView(){
   const independent=view==='independent';
-  $('heroTitle').closest('.hero').hidden=independent;
-  $('discover').hidden=independent;
+  const library=view==='all'||view==='favorites'||state.playlists.some(p=>p.id===view);
+  $('heroTitle').closest('.hero').hidden=view!=='all';
+  $('discover').hidden=view!=='all';
   $('catalogSection').hidden=!independent;
-  $('heading').closest('.library-heading').hidden=independent;
-  $('status').hidden=independent;
-  $('results').hidden=independent;
-  $('empty').hidden=independent||visibleSongs.length>0;
-  $('ownMusic').hidden=independent;
+  $('heading').closest('.library-heading').hidden=!library;
+  $('status').hidden=!library;
+  $('results').hidden=!library;
+  $('empty').hidden=!library||visibleSongs.length>0;
+  $('ownMusic').hidden=!library;
+  $('searchArea')?.setAttribute('hidden','');
 }
 function render() {
   document.querySelectorAll('[data-view]').forEach(e=>e.classList.toggle('active',e.dataset.view===view));
