@@ -34,7 +34,7 @@ async function handler(req,res){
   const page=Number(req.query?.page||1);
   if(!Number.isSafeInteger(page)||page<1||page>50)return res.status(400).json({error:'Page must be between 1 and 50.'});
   const trackId=String(req.query?.track||'').trim();
-  if(trackId&&!/^\\d{1,15}$/.test(trackId))return res.status(400).json({error:'Invalid track ID.'});
+  if(trackId&&!/^\d{1,15}$/.test(trackId))return res.status(400).json({error:'Invalid track ID.'});
   const q=String(req.query?.q||'').trim();
   if(q.length>100)return res.status(400).json({error:'Search is too long.'});
   const sort=req.query?.sort==='new'?'new':'popular';
