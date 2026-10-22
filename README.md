@@ -1,10 +1,17 @@
-# Tambay Music 🎵
+# Musikero — Feel Every Note 🎧
 
-Spotify-inspired **music discovery** web app, deployed from the `dist/` directory with a server-side YouTube search function. Includes a visible, official YouTube player, personal playlists and likes (saved in browser storage), a Latest filter, user-owned audio import, and a lightweight PWA install experience.
+Premium black-and-emerald **music discovery** web app, deployed from the `dist/` directory with a server-side YouTube search function. Includes a visible, official YouTube player, personal playlists and likes (saved in browser storage), a Latest filter, user-owned audio import, and a lightweight PWA install experience.
+
+## Premium UI design
+- Black/emerald luxury theme with dimensional vinyl record artwork, 3D album sleeve, atmospheric lighting and glass-effect surfaces, all made in CSS and SVG.
+- Responsive desktop, tablet and phone layouts; accessible buttons, focus rings, and reduced-motion handling.
+- A persistent player dock, in-app video player and responsive play queue. The 3D effects are visual only and do not change YouTube playback restrictions.
+- App branding, favicon, manifest and PWA cache are updated to **Musikero**.
+- Existing users' browser collections migrate from the previous `tambay-v1` key to `musikero-v1` when a change is saved; no playlist reset is required.
 
 ## What it does
 - Search current YouTube videos and music releases through YouTube Data API v3.
-- Select a result to open the **visible official YouTube player inside Tambay**. The player remains visible above the persistent playback dock; use its controls or the dock to play/pause. It may show YouTube ads. Some videos block embedding and can only be opened on YouTube by clicking the optional link.
+- Select a result to open the **visible official YouTube player inside Musikero**. The player remains visible above the persistent playback dock; use its controls or the dock to play/pause. It may show YouTube ads. Some videos block embedding and can only be opened on YouTube by clicking the optional link.
 - Use the **fixed bottom music dock** with artwork, track title, play/pause, previous/next, progress seek and a song queue. Save videos as favorites or in playlists on the current browser.
 - Import **your own audio files** (or properly licensed tracks) from your device for playback using the native HTML audio player, with a download link to the same file. Files stay in browser memory for this tab and are **not** uploaded, stored permanently, or synced.
 - Install as a PWA where the browser supports it; the service worker caches only app-shell assets, **not YouTube audio/video**.
