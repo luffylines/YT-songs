@@ -4,11 +4,11 @@ Spotify-inspired **music discovery** web app, deployed from the `dist/` director
 
 ## What it does
 - Search current YouTube videos and music releases through YouTube Data API v3.
-- Select a result to open the official YouTube embed **with its controls and ads intact**. Click play inside the visible player. Some videos block embedding.
-- Save videos as favorites or in playlists on the current browser.
+- Select a result to open the **visible official YouTube player inside Tambay**. The player remains visible above the persistent playback dock; use its controls or the dock to play/pause. It may show YouTube ads. Some videos block embedding and can only be opened on YouTube by clicking the optional link.
+- Use the **fixed bottom music dock** with artwork, track title, play/pause, previous/next, progress seek and a song queue. Save videos as favorites or in playlists on the current browser.
 - Import **your own audio files** (or properly licensed tracks) from your device for playback using the native HTML audio player, with a download link to the same file. Files stay in browser memory for this tab and are **not** uploaded, stored permanently, or synced.
 - Install as a PWA where the browser supports it; the service worker caches only app-shell assets, **not YouTube audio/video**.
-- Native audio background playback / lock-screen controls *may* work depending on the phone, OS, and browser; it is not guaranteed. YouTube embeds deliberately stop when the tab becomes hidden.
+- Native audio background playback / lock-screen controls *may* work depending on the phone, OS, and browser; it is not guaranteed. YouTube embeds deliberately stop when the tab becomes hidden or the mobile queue sheet overlays the player.
 
 ## Deployment on Vercel
 1. Import [this repository](https://github.com/luffylines/YT-songs) into Vercel as a new project.
