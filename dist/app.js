@@ -14,7 +14,6 @@ try { const saved = JSON.parse(localStorage.getItem('tambay-v1')); if (saved && 
   state.songs = saved.songs.filter(s => validId(s.id) && typeof s.title === 'string').map(s => ({id:s.id,title:s.title,artist:typeof s.artist === 'string'?s.artist:'',favorite:!!s.favorite}));
   state.playlists = saved.playlists.filter(p => typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.songs)).map(p=>({...p,songs:p.songs.filter(validId)}));
 } } catch { $('status').textContent = 'Saved library could not be read. You can start a new collection.'; }
-let apiKey = ''; try { apiKey = sessionStorage.getItem('tambay-search-key') || ''; } catch {}
 function status(message) { $('status').textContent = message; }
 function save() { try { localStorage.setItem('tambay-v1',JSON.stringify(state)); return true; } catch { status('Storage is full or unavailable. Changes will only last while this page stays open.'); return false; } }
 function node(tag, text, className) { const e=document.createElement(tag); if(text!==undefined)e.textContent=text; if(className)e.className=className; return e; }
@@ -44,16 +43,17 @@ function render() {
     else actions.append(button(list?'Remove':'Delete',()=>{if(list)list.songs=list.songs.filter(id=>id!==song.id);else{state.songs=state.songs.filter(s=>s.id!==song.id);state.playlists.forEach(p=>p.songs=p.songs.filter(id=>id!==song.id));}save();render();status(list?'Removed from playlist.':'Removed from library.');}));
     card.append(actions);$('results').append(card);
   });
-  $('searchHint').textContent=apiKey?'Connected to YouTube search · Results play through the official YouTube player.':'Search your library, or discover music on YouTube.';
+  $('searchHint').textContent='Live YouTube music discovery · Results open in the visible official YouTube player.';
 }
 function assign(song) { selectedSong=song;$('playlistChoices').replaceChildren(); if(!state.playlists.length){$('playlistChoices').append(node('p','Create a playlist first.'),button('+ New playlist',()=>{$('assignDialog').close();showDialog('playlistDialog');}));}else state.playlists.forEach(p=>$('playlistChoices').append(button(p.name,()=>{addSong(song);if(!p.songs.includes(song.id))p.songs.push(song.id);save();render();$('assignDialog').close();status('Added to '+p.name+'.');})));showDialog('assignDialog'); }
 let apiLoading=false;
 function play(song) {
+  $('audioPlayer').pause();$('audioPanel').hidden=true;
   pendingVideo=song;$('playerPanel').hidden=false;$('playingTitle').textContent=song.title;$('watchLink').href='https://www.youtube.com/watch?v='+song.id;$('playerStatus').textContent='Use the YouTube controls to play. Some videos may only play on YouTube.';
   if(player?.cueVideoById)player.cueVideoById(song.id);
   else if(!apiLoading){apiLoading=true;const script=node('script');script.src='https://www.youtube.com/iframe_api';script.onerror=()=>{apiLoading=false;$('playerStatus').textContent='YouTube player could not load. Open the video on YouTube instead.';};document.head.append(script);}
 }
-window.onYouTubeIframeAPIReady=()=>{player=new YT.Player('player',{width:'100%',height:'230',videoId:pendingVideo?.id,playerVars:{playsinline:1,origin:location.origin},events:{onError:()=>{$('playerStatus').textContent='This video is unavailable here or embedding is disabled. Try Open on YouTube.';},onReady:()=>{if($('playerPanel').hidden||document.hidden)player.pauseVideo();},onStateChange:e=>{if(e.data===1 && (document.hidden||$('playerPanel').hidden))player.pauseVideo();}}});};
+window.onYouTubeIframeAPIReady=()=>{player=new YT.Player('player',{width:'100%',height:'230',videoId:pendingVideo?.id,playerVars:{playsinline:1,origin:location.origin},events:{onError:()=>{$('playerStatus').textContent='This video is unavailable here or embedding is disabled. Try Open on YouTube.';},onReady:()=>{if($('playerPanel').hidden||document.hidden)player.pauseVideo();},onStateChange:e=>{if(e.data===1){$('audioPlayer').pause();if(document.hidden||$('playerPanel').hidden)player.pauseVideo();}}}});};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)player?.pauseVideo?.();});
 $('closePlayer').onclick=()=>{player?.pauseVideo?.();$('playerPanel').hidden=true;};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
@@ -62,15 +62,101 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.data
 $('newPlaylist').onclick=()=>showDialog('playlistDialog');
 $('addForm').onsubmit=e=>{e.preventDefault();const id=parseVideo($('videoUrl').value.trim());if(!id){$('addError').textContent='Enter a valid YouTube video link (watch, shorts, live, or youtu.be).';return;}const title=$('songTitle').value.trim();if(!title){$('addError').textContent='Enter a song title.';return;}addSong({id,title,artist:$('artist').value.trim()});save();$('addDialog').close();e.target.reset();$('addError').textContent='';setView('all');status('Song added. Select its thumbnail to open the player.');};
 $('playlistForm').onsubmit=e=>{e.preventDefault();const name=$('playlistName').value.trim();if(!name)return;const p={id:crypto.randomUUID(),name,songs:[]};state.playlists.push(p);save();$('playlistDialog').close();e.target.reset();setView(p.id);};
-$('settings').onclick=()=>{$('origin').textContent=location.origin+'/*';$('apiKey').value=apiKey;showDialog('settingsDialog');};
-$('settingsForm').onsubmit=e=>{e.preventDefault();apiKey=$('apiKey').value.trim();try{if(apiKey)sessionStorage.setItem('tambay-search-key',apiKey);else sessionStorage.removeItem('tambay-search-key');}catch{}$('settingsDialog').close();render();status(apiKey?'Search key saved for this tab. Search to test the connection.':'YouTube search disconnected.');};
+$('settings').onclick=()=>showDialog('helpDialog');
+document.querySelectorAll('[data-search]').forEach(b=>b.onclick=()=>{
+  $('query').value=b.dataset.search;
+  $('searchForm').requestSubmit();
+});
 $('searchForm').onsubmit=async e=>{
- e.preventDefault();query=$('query').value.trim();if(!query)return;const version=++requestVersion;
- if(!apiKey){searchResults=null;render();status('Showing library matches. ');const a=node('a','Search YouTube ↗');a.href='https://www.youtube.com/results?search_query='+encodeURIComponent(query+' music');a.target='_blank';a.rel='noopener';$('status').append(a);return;}
- const submit=e.target.querySelector('button');submit.disabled=true;status('Searching YouTube…');
- try {const params=new URLSearchParams({part:'snippet',type:'video',videoEmbeddable:'true',maxResults:'12',q:query,key:apiKey});const response=await fetch('https://www.googleapis.com/youtube/v3/search?'+params,{signal:AbortSignal.timeout(15000)});const data=await response.json();if(version!==requestVersion)return;if(!response.ok){const reason=data.error?.errors?.[0]?.reason;throw new Error(reason==='quotaExceeded'?'YouTube search quota reached. Try later or add a link.':'Search could not connect. Check the API key, enabled API, and website restrictions.');}
- searchResults=(data.items||[]).filter(x=>validId(x.id?.videoId)).map(x=>({id:x.id.videoId,title:decode(x.snippet.title),artist:decode(x.snippet.channelTitle)}));render();status(searchResults.length+' results from YouTube.');
- } catch(error){if(version===requestVersion)status(error.name==='TimeoutError'?'Search timed out. Please try again.':error instanceof TypeError?'Network error. Check your connection and try again.':error.message);}finally{submit.disabled=false;}
+  e.preventDefault();
+  query=$('query').value.trim();
+  if(!query)return;
+  const version=++requestVersion;
+  const submit=e.target.querySelector('button[type=submit],button.primary');
+  submit.disabled=true;
+  status('Finding music on YouTube…');
+  try{
+    const url='/api/search?'+new URLSearchParams({q:query,sort:$('searchMode').value});
+    const response=await fetch(url,{signal:AbortSignal.timeout(13000)});
+    const data=await response.json();
+    if(version!==requestVersion)return;
+    if(!response.ok)throw new Error(data.error||'YouTube search is unavailable.');
+    searchResults=(data.items||[]).filter(x=>validId(x.id)).map(x=>({
+      id:x.id,title:decode(x.title||'Untitled'),artist:decode(x.artist||'YouTube')
+    }));
+    render();
+    status(searchResults.length+' YouTube results · '+($('searchMode').value==='date'?'Newest uploads':'Best match')+'. Select a cover to open the player.');
+  }catch(error){
+    if(version===requestVersion){
+      status(error.name==='TimeoutError'?'YouTube search timed out. Please try again.':error.message||'Could not search.');
+      const a=node('a',' Search on YouTube ↗');
+      a.href='https://www.youtube.com/results?search_query='+encodeURIComponent(query+' music');
+      a.target='_blank';a.rel='noopener';$('status').append(a);
+    }
+  }finally{submit.disabled=false;}
 };
 function decode(value){const doc=new DOMParser().parseFromString(value,'text/html');return doc.documentElement.textContent;}
+// Imported audio is available during this tab session only; no uploads occur.
+const localTracks=[];
+let activeAudio=-1;
+function renderLocal(){
+  $('localCount').textContent=String(localTracks.length);
+  $('localHint').hidden=localTracks.length>0;
+  $('localResults').replaceChildren();
+  localTracks.forEach((track,i)=>{
+    const card=node('article',undefined,'local-card');
+    const art=node('div','♫','local-art');
+    const info=node('div',undefined,'local-info');
+    info.append(node('strong',track.title),node('small',track.fileName));
+    const actions=node('div',undefined,'local-actions');
+    actions.append(button('▶ Play',()=>playLocal(i),'Play '+track.title));
+    const dl=node('a','↓');dl.href=track.url;dl.download=track.fileName;dl.title='Download your own file';dl.setAttribute('aria-label','Download '+track.title);actions.append(dl);
+    actions.append(button('×',()=>{
+      if(activeAudio===i){$('audioPlayer').pause();$('audioPlayer').removeAttribute('src');$('audioPanel').hidden=true;activeAudio=-1;}
+      else if(activeAudio>i)activeAudio--;
+      URL.revokeObjectURL(track.url);localTracks.splice(i,1);renderLocal();
+    },'Remove '+track.title));
+    card.append(art,info,actions);$('localResults').append(card);
+  });
+}
+function playLocal(i){
+  const track=localTracks[i];if(!track)return;
+  player?.pauseVideo?.();$('playerPanel').hidden=true;
+  activeAudio=i;
+  $('audioPanel').hidden=false;
+  $('audioTitle').textContent=track.title;
+  $('downloadAudio').href=track.url;$('downloadAudio').download=track.fileName;
+  const audio=$('audioPlayer');
+  if(audio.src!==track.url)audio.src=track.url;
+  audio.play().catch(()=>status('Tap Play in the audio controls to start your music.'));
+  if('mediaSession' in navigator && 'MediaMetadata' in window){
+    navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:'My audio · Tambay'});
+    navigator.mediaSession.setActionHandler('previoustrack',()=>moveAudio(-1));
+    navigator.mediaSession.setActionHandler('nexttrack',()=>moveAudio(1));
+    navigator.mediaSession.setActionHandler('play',()=>audio.play());
+    navigator.mediaSession.setActionHandler('pause',()=>audio.pause());
+  }
+}
+function moveAudio(n){
+  if(!localTracks.length)return;
+  playLocal((activeAudio+n+localTracks.length)%localTracks.length);
+}
+$('audioPlayer').addEventListener('ended',()=>moveAudio(1));
+$('audioPlayer').addEventListener('error',()=>status('This audio format may not be supported by your browser.'));
+$('prevAudio').onclick=()=>moveAudio(-1);
+$('nextAudio').onclick=()=>moveAudio(1);
+$('closeAudio').onclick=()=>{$('audioPlayer').pause();$('audioPanel').hidden=true;};
+['importMusic','importMusicMore'].forEach(id=>$(id).onclick=()=>$('audioFiles').click());
+$('audioFiles').onchange=e=>{
+  for(const file of Array.from(e.target.files||[]).slice(0,50)){
+    if(!file.type.startsWith('audio/')&&!/\.(mp3|m4a|ogg|wav|aac|flac)$/i.test(file.name))continue;
+    if(localTracks.some(t=>t.fileName===file.name&&t.size===file.size))continue;
+    const url=URL.createObjectURL(file);
+    localTracks.push({url,fileName:file.name,title:file.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '),size:file.size});
+  }
+  e.target.value='';renderLocal();
+  status(localTracks.length?'Your audio is ready. Imported files remain on this device, in this tab.':'No supported audio files were selected.');
+};
+window.addEventListener('beforeunload',()=>localTracks.forEach(t=>URL.revokeObjectURL(t.url)));
+renderLocal();
 render();
