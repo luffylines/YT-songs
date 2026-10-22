@@ -11,6 +11,8 @@ function parseVideo(value) {
 }
 let state = {songs:[], playlists:[]}, view = 'all', query = '', searchResults = null, player = null, pendingVideo = null, selectedSong = null, requestVersion = 0;
 let visibleSongs = [], youtubeQueue = [], queuePosition = -1, activeSource = null, youtubeIsPlaying = false;
+// Independent artist streaming stays in memory; never persist provider audio URLs or cache media.
+let catalogQueue = [], catalogPosition = -1;
 // Preserve music collections from older Tambay installations during the Musikero rebrand.
 try { const saved = JSON.parse(localStorage.getItem('musikero-v1') || localStorage.getItem('tambay-v1')); if (saved && Array.isArray(saved.songs) && Array.isArray(saved.playlists)) {
   state.songs = saved.songs.filter(s => validId(s.id) && typeof s.title === 'string').map(s => ({id:s.id,title:s.title,artist:typeof s.artist === 'string'?s.artist:'',favorite:!!s.favorite}));
@@ -53,13 +55,13 @@ function assign(song) { selectedSong=song;$('playlistChoices').replaceChildren()
 let apiLoading=false;
 const audio = $('audioPlayer');
 function playbackSong(){
-  return activeSource==='youtube' ? pendingVideo : activeSource==='local' ? localTracks[activeAudio] : null;
+  return activeSource==='youtube' ? pendingVideo : activeSource==='local' ? localTracks[activeAudio] : activeSource==='catalog' ? catalogQueue[catalogPosition] : null;
 }
 function playbackLength(){
-  return activeSource==='youtube' ? youtubeQueue.length : activeSource==='local' ? localTracks.length : 0;
+  return activeSource==='youtube' ? youtubeQueue.length : activeSource==='local' ? localTracks.length : activeSource==='catalog' ? catalogQueue.length : 0;
 }
 function isPlaying(){
-  if(activeSource==='local')return !audio.paused && !audio.ended;
+  if(activeSource==='local'||activeSource==='catalog')return !audio.paused && !audio.ended;
   return activeSource==='youtube' && youtubeIsPlaying;
 }
 function clock(seconds){
@@ -71,7 +73,7 @@ function syncProgress(){
   let now=0,duration=0;
   if(activeSource==='youtube'&&player?.getDuration){
     try{duration=Number(player.getDuration())||0;now=Number(player.getCurrentTime())||0;}catch{}
-  }else if(activeSource==='local'){
+  }else if(activeSource==='local'||activeSource==='catalog'){
     duration=Number(audio.duration)||0;now=Number(audio.currentTime)||0;
   }
   $('barTime').textContent=clock(now);
@@ -85,15 +87,22 @@ function syncTransport(){
   const track=playbackSong(), youtube=activeSource==='youtube';
   $('bottomPlayer').classList.toggle('has-track',!!track);
   $('barTitle').textContent=track ? track.title : 'Choose a song';
-  $('barArtist').textContent=!track ? 'Your soundtrack starts here' : youtube ? (track.artist||'YouTube') : 'Your imported audio';
-  $('barArtwork').src=youtube&&track ? 'https://i.ytimg.com/vi/'+track.id+'/mqdefault.jpg' : '/icon.svg';
-  $('barSource').textContent=!track?'MUSIKERO':youtube?'YOUTUBE · IN-APP PLAYER':'MY AUDIO · THIS DEVICE';
+  $('barArtist').textContent=!track ? 'Your soundtrack starts here' : youtube ? (track.artist||'YouTube') : activeSource==='catalog' ? track.artist+' · Jamendo' : 'Your imported audio';
+  $('barArtwork').src=youtube&&track ? 'https://i.ytimg.com/vi/'+track.id+'/mqdefault.jpg' : activeSource==='catalog'&&track?.image ? track.image : '/icon.svg';
+  $('barSource').textContent=!track?'MUSIKERO':youtube?'YOUTUBE · IN-APP PLAYER':activeSource==='catalog'?'INDEPENDENT MUSIC · JAMENDO':'MY AUDIO · THIS DEVICE';
   $('barPlay').disabled=!track;
   $('barPlay').textContent=isPlaying()?'❚❚':'▶';
   $('barPlay').setAttribute('aria-label',isPlaying()?'Pause':'Play');
-  $('barPrev').disabled=!track||(youtube?queuePosition<=0:activeAudio<=0);
-  $('barNext').disabled=!track||(youtube?queuePosition>=youtubeQueue.length-1:activeAudio>=localTracks.length-1);
-  $('barLike').hidden=!youtube;
+  const index=youtube?queuePosition:activeSource==='catalog'?catalogPosition:activeAudio;
+  $('barPrev').disabled=!track||index<=0;
+  $('barNext').disabled=!track||index>=playbackLength()-1;
+  $('barLike').hidden=!(youtube||activeSource==='catalog');
+  if(activeSource==='catalog'&&track){
+    $('barLike').disabled=false;
+    const fav=window.MusikeroCatalog?.isFavorite?.(track.id)||false;
+    $('barLike').textContent=fav?'♥':'♡';
+    $('barLike').setAttribute('aria-pressed',String(fav));
+  }
   if(youtube&&track){
     const saved=state.songs.find(x=>x.id===track.id);
     $('barLike').disabled=false;$('barLike').textContent=saved?.favorite?'♥':'♡';
@@ -110,23 +119,25 @@ function syncTransport(){
   if(!$('queuePanel').hidden)renderQueue();
 }
 function renderQueue(){
-  const tracks=activeSource==='youtube'?youtubeQueue:activeSource==='local'?localTracks:[];
-  const current=activeSource==='youtube'?queuePosition:activeAudio;
+  const tracks=activeSource==='youtube'?youtubeQueue:activeSource==='local'?localTracks:activeSource==='catalog'?catalogQueue:[];
+  const current=activeSource==='youtube'?queuePosition:activeSource==='catalog'?catalogPosition:activeAudio;
   $('queueItems').replaceChildren();
   if(!tracks.length){$('queueItems').append(node('p','Choose a song to fill your queue.'));return;}
   tracks.forEach((track,i)=>{
     const item=button('',()=>{
       if(activeSource==='youtube'){queuePosition=i;showYoutube(track,true);}
+      else if(activeSource==='catalog'){catalogPosition=i;playCatalogAt(i);}
       else playLocal(i);
       closeQueue();
     },'Play '+track.title);
     item.className='queue-track';
     if(i===current)item.classList.add('queue-current');
     const thumb=node('img');
-    thumb.src=activeSource==='youtube'?'https://i.ytimg.com/vi/'+track.id+'/mqdefault.jpg':'/icon.svg';
+    thumb.src=activeSource==='youtube'?'https://i.ytimg.com/vi/'+track.id+'/mqdefault.jpg':activeSource==='catalog'?(track.image||'/icon.svg'):'/icon.svg';
     thumb.alt='';thumb.loading='lazy';
     const copy=node('span',undefined,'queue-copy');
-    copy.append(node('strong',track.title),node('small',activeSource==='youtube'?(track.artist||'YouTube'):'My audio'));
+    copy.append(node('strong',track.title),node('small',activeSource==='youtube'?(track.artist||'YouTube'):activeSource==='catalog'?(track.artist+' · Jamendo'):'My audio'));
+
     item.append(thumb,copy,node('span',i===current?'♫':String(i+1),'queue-index'));
     $('queueItems').append(item);
   });
@@ -198,6 +209,11 @@ function moveQueue(delta){
     if(next<0||next>=youtubeQueue.length)return false;
     queuePosition=next;showYoutube(youtubeQueue[next],true);return true;
   }
+  if(activeSource==='catalog'){
+    const next=catalogPosition+delta;
+    if(next<0||next>=catalogQueue.length)return false;
+    playCatalogAt(next);return true;
+  }
   if(activeSource==='local'){
     const next=activeAudio+delta;
     if(next<0||next>=localTracks.length)return false;
@@ -212,7 +228,7 @@ function togglePlayback(){
       return;
     }
     try{if(player.getPlayerState()===1)player.pauseVideo();else if(!document.hidden)player.playVideo();}catch{}
-  }else if(activeSource==='local'){
+  }else if(activeSource==='local'||activeSource==='catalog'){
     if(audio.paused)audio.play().catch(()=>status('Tap the play button to allow audio.'));
     else audio.pause();
   }
@@ -221,6 +237,9 @@ $('barPlay').onclick=togglePlayback;
 $('barPrev').onclick=()=>moveQueue(-1);
 $('barNext').onclick=()=>moveQueue(1);
 $('barLike').onclick=()=>{
+  if(activeSource==='catalog'){
+    const track=catalogQueue[catalogPosition];if(track)window.MusikeroCatalog?.toggleFavorite?.(track);syncTransport();return;
+  }
   if(activeSource!=='youtube'||!pendingVideo)return;
   const saved=addSong(pendingVideo);saved.favorite=!saved.favorite;
   save();render();syncTransport();
@@ -247,7 +266,7 @@ $('seekSlider').onchange=()=>{
   if(activeSource==='youtube'&&player?.getDuration){
     duration=Number(player.getDuration())||0;
     if(duration>0)player.seekTo(duration*Number($('seekSlider').value)/1000,true);
-  }else if(activeSource==='local'){
+  }else if(activeSource==='local'||activeSource==='catalog'){
     duration=Number(audio.duration)||0;
     if(duration>0)audio.currentTime=duration*Number($('seekSlider').value)/1000;
   }
@@ -261,6 +280,48 @@ document.addEventListener('visibilitychange',()=>{
   if(document.hidden&&activeSource==='youtube')player?.pauseVideo?.();
 });
 setInterval(syncProgress,1000);
+
+// Play streams directly from the independent music provider. Do not cache or offer downloads.
+function validCatalogStream(url){
+  try{const u=new URL(url);return u.protocol==='https:'&&(u.hostname==='jamendo.com'||u.hostname.endsWith('.jamendo.com'));}catch{return false;}
+}
+function playCatalogAt(index){
+  const track=catalogQueue[index];
+  if(!track||!validCatalogStream(track.audio))return;
+  player?.pauseVideo?.();
+  $('playerPanel').hidden=true;
+  activeSource='catalog';catalogPosition=index;youtubeIsPlaying=false;
+  const stream=track.audio;
+  if(audio.src!==stream){audio.src=stream;audio.load();}
+  if('mediaSession' in navigator&&'MediaMetadata' in window){
+    try{
+      navigator.mediaSession.metadata=new MediaMetadata({
+        title:track.title,artist:track.artist,album:track.album||'Independent music · Jamendo',
+        artwork:track.image?[{src:track.image,sizes:'300x300',type:'image/jpeg'}]:[]
+      });
+      navigator.mediaSession.setActionHandler('play',()=>audio.play());
+      navigator.mediaSession.setActionHandler('pause',()=>audio.pause());
+      navigator.mediaSession.setActionHandler('nexttrack',()=>moveQueue(1));
+      navigator.mediaSession.setActionHandler('previoustrack',()=>moveQueue(-1));
+      navigator.mediaSession.setActionHandler('seekto',e=>{if(Number.isFinite(e.seekTime))audio.currentTime=e.seekTime;});
+    }catch{}
+  }
+  audio.play().catch(()=>status('Tap Play in the bottom bar to start independent music.'));
+  syncTransport();
+}
+window.MusikeroAudio=Object.freeze({
+  play(track,items){
+    if(!track||!Array.isArray(items))return;
+    const unique=new Map();
+    for(const item of items){if(item?.id?.startsWith('jm-')&&validCatalogStream(item.audio))unique.set(item.id,item);}
+    if(validCatalogStream(track.audio))unique.set(track.id,track);
+    catalogQueue=Array.from(unique.values());
+    catalogPosition=catalogQueue.findIndex(item=>item.id===track.id);
+    playCatalogAt(catalogPosition);
+  },
+  isCurrent(id){return activeSource==='catalog'&&catalogQueue[catalogPosition]?.id===id;},
+  refresh(){syncTransport();}
+});
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 ['addHero','addSong','emptyAdd'].forEach(id=>$(id).onclick=()=>showDialog('addDialog'));
