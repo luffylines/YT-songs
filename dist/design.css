@@ -298,7 +298,7 @@ button:active,.primary:active,.hero-secondary:active{transform:translateY(1px) s
 #playerPanel button{min-height:40px}
 @media(max-width:760px){
   body{overflow-x:hidden}
-  main{min-width:0!important;padding-left:15px!important;padding-right:15px!important;padding-bottom:calc(112px + env(safe-area-inset-bottom))!important}
+  main{min-width:0!important;padding-top:18px!important;padding-left:15px!important;padding-right:15px!important;padding-bottom:calc(160px + env(safe-area-inset-bottom))!important}
   .topbar{min-height:52px!important;gap:8px!important}
   .topbar .breadcrumb{font-size:9px!important;letter-spacing:.12em!important}
   .topbar-actions{gap:6px!important}
@@ -454,7 +454,7 @@ button:active,.primary:active,.hero-secondary:active{transform:translateY(1px) s
 }
 @media(max-width:390px){
   body{padding-bottom:160px!important}
-  main{padding-top:118px!important;padding-left:9px!important;padding-right:9px!important}
+  main{padding-top:18px!important;padding-left:9px!important;padding-right:9px!important}
   .sidebar{left:7px!important;right:7px!important;padding:5px!important}
   .sidebar>nav{gap:3px!important}
   .sidebar>nav button{font-size:9px!important;min-height:46px!important}
