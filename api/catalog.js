@@ -33,6 +33,8 @@ async function handler(req,res){
   if(!key)return res.status(503).json({error:'Independent music is not configured yet. Add JAMENDO_CLIENT_ID on Vercel.'});
   const page=Number(req.query?.page||1);
   if(!Number.isSafeInteger(page)||page<1||page>50)return res.status(400).json({error:'Page must be between 1 and 50.'});
+  const trackId=String(req.query?.track||'').trim();
+  if(trackId&&!/^\\d{1,15}$/.test(trackId))return res.status(400).json({error:'Invalid track ID.'});
   const q=String(req.query?.q||'').trim();
   if(q.length>100)return res.status(400).json({error:'Search is too long.'});
   const sort=req.query?.sort==='new'?'new':'popular';
@@ -42,14 +44,15 @@ async function handler(req,res){
   url.searchParams.set('client_id',key);
   url.searchParams.set('format','json');
   url.searchParams.set('limit',String(PAGE_SIZE));
-  url.searchParams.set('offset',String((page-1)*PAGE_SIZE));
+  url.searchParams.set('offset',String(trackId?0:(page-1)*PAGE_SIZE));
   url.searchParams.set('audioformat','mp31');
   url.searchParams.set('imagesize','300');
   url.searchParams.set('type','single albumtrack');
   url.searchParams.set('include','licenses');
-  if(q){url.searchParams.set('search',q);url.searchParams.set('order','relevance');}
-  else url.searchParams.set('order',sort==='new'?'releasedate_desc':'popularity_month');
-  if(genre)url.searchParams.set('tags',genre==='lofi'?'relaxation':genre);
+  if(trackId){url.searchParams.set('id',trackId);url.searchParams.set('limit','1');}
+  if(!trackId&&q){url.searchParams.set('search',q);url.searchParams.set('order','relevance');}
+  else if(!trackId)url.searchParams.set('order',sort==='new'?'releasedate_desc':'popularity_month');
+  if(!trackId&&genre)url.searchParams.set('tags',genre==='lofi'?'relaxation':genre);
   try{
     const response=await fetch(url,{signal:AbortSignal.timeout(12000)});
     if(!response.ok)return res.status(502).json({error:'Music catalog is temporarily unavailable.'});
@@ -58,7 +61,7 @@ async function handler(req,res){
     const raw=Array.isArray(data?.results)?data.results:[];
     const items=raw.map(track).filter(Boolean);
     return res.status(200).json({
-      items,page,pageSize:PAGE_SIZE,hasMore:raw.length===PAGE_SIZE,
+      items,page,pageSize:PAGE_SIZE,hasMore:!trackId&&raw.length===PAGE_SIZE,
       provider:'Jamendo',notice:'Jamendo independent artists. Non-commercial use only; no offline caching.'
     });
   }catch{return res.status(502).json({error:'Could not reach the independent music catalog. Try again.'});}
