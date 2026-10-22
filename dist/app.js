@@ -9,7 +9,7 @@ function parseVideo(value) {
     return validId(id) ? id : null;
   } catch { return null; }
 }
-let state = {songs:[], playlists:[]}, view = 'all', query = '', searchResults = null, player = null, pendingVideo = null, selectedSong = null, requestVersion = 0;
+let state = {songs:[], playlists:[]}, view = 'independent', query = '', searchResults = null, player = null, pendingVideo = null, selectedSong = null, requestVersion = 0;
 let visibleSongs = [], youtubeQueue = [], priorityQueue = [], queuePosition = -1, activeSource = null, youtubeIsPlaying = false;
 // Independent artist streaming stays in memory; never persist provider audio URLs or cache media.
 let catalogQueue = [], catalogPosition = -1;
