@@ -123,6 +123,8 @@ function syncTransport(){
     $('barLike').setAttribute('aria-pressed',String(!!saved?.favorite));
   }
   $('barVideo').hidden=!youtube;
+  $('barVideo').textContent=$('playerPanel').hidden?'▣ Show video':'− Hide video';
+  $('barVideo').setAttribute('aria-label',$('playerPanel').hidden?'Show video player':'Hide video player');
   $('barDownload').hidden=activeSource!=='local'||!track;
   if(activeSource==='local'&&track){
     $('barDownload').href=track.url;
@@ -266,12 +268,21 @@ $('barLike').onclick=()=>{
   const saved=addSong(pendingVideo);saved.favorite=!saved.favorite;
   save();render();syncTransport();
 };
-$('barVideo').onclick=()=>{
+function toggleVideoPanel(){
   if(activeSource!=='youtube')return;
-  closeQueue();$('playerPanel').focus({preventScroll:true});
-  $('playerPanel').classList.add('focus-pulse');
-  setTimeout(()=>$('playerPanel').classList.remove('focus-pulse'),900);
-};
+  const hiding=!$('playerPanel').hidden;
+  $('playerPanel').hidden=hiding;
+  if(!hiding){
+    closeQueue();
+    $('playerPanel').focus({preventScroll:true});
+    $('playerPanel').classList.add('focus-pulse');
+    setTimeout(()=>$('playerPanel').classList.remove('focus-pulse'),900);
+  }
+  $('barVideo').textContent=hiding?'▣ Show video':'− Hide video';
+  $('barVideo').setAttribute('aria-label',hiding?'Show video player':'Hide video player');
+}
+$('barVideo').onclick=toggleVideoPanel;
+$('hideVideo').onclick=toggleVideoPanel;
 $('barQueue').onclick=()=>{
   const opening=$('queuePanel').hidden;
   if(opening&&window.innerWidth<900&&activeSource==='youtube'){
