@@ -1,7 +1,7 @@
-name: Verify Tambay
+name: Verify Musikero
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [main, 'feature/**', 'design/**']
   pull_request:
 jobs:
   verify:

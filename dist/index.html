@@ -1,11 +1,54 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><meta name="theme-color" content="#111615"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><title>Tambay Music — Discover &amp; listen</title><link rel="stylesheet" href="style.css"></head>
-<body><aside><a class="brand" href="./"><span>♫</span> tambay<span class="dot">.</span></a><p class="eyebrow">YOUR MUSIC CORNER</p><nav><button data-view="all" class="active">◉ &nbsp; My library</button><button data-view="favorites">♡ &nbsp; Favorites</button></nav><div class="section-label">YOUR PLAYLISTS <button id="newPlaylist" aria-label="Create playlist">+</button></div><div id="playlists"></div><div class="side-note"><span class="online"></span> A little space for your sound.<p>Library saved on this browser.</p></div></aside>
-<main><header><span class="breadcrumb">♫  YOUR PERSONAL MUSIC SPACE</span><button id="settings">ⓘ &nbsp; About playback</button></header><section class="hero"><div><span class="pill">PRESS PLAY. STAY A WHILE.</span><h1>Good music.<br>Good company.</h1><p>YouTube discovery, your playlists, and audio from your own device. One little corner for your sound.</p><button class="primary" id="addHero">+ Save a YouTube song</button></div><div class="record" aria-hidden="true"><div>t<span>side A / everyday sounds</span></div></div></section>
-<section class="search-area"><form id="searchForm"><label class="sr-only" for="query">Search songs or artists</label><input id="query" placeholder="Search songs, artists, new releases…" maxlength="100" required><select id="searchMode" aria-label="Search sorting"><option value="relevance">Best match</option><option value="date">Newest uploads</option></select><button class="primary">Discover</button></form><p id="searchHint">Search YouTube music using a server-side API key. YouTube ads and restrictions still apply.</p><div class="quick-search" aria-label="Quick searches"><button type="button" data-search="OPM music">OPM</button><button type="button" data-search="P-pop music">P-pop</button><button type="button" data-search="K-pop music">K-pop</button><button type="button" data-search="lofi chill music">Chill</button><button type="button" data-search="new music 2026">New music</button></div></section>
-<div class="library-heading"><div><span class="eyebrow">ON YOUR ROTATION</span><h2 id="heading">My library</h2></div><div class="library-actions"><button id="importMusic" type="button">↑ Import my audio</button><button id="addSong">+ YouTube link</button></div></div><p id="status" role="status" aria-live="polite"></p><div id="results" class="grid"></div><div id="empty" class="empty"><div class="empty-icon">♫</div><h3>Your next favorite starts here.</h3><p>Paste a YouTube link to start your collection.<br>Or search YouTube above to discover new songs.</p><button id="emptyAdd" class="primary">Add your first song</button></div>
-<section class="own-music" id="ownMusic"><div class="library-heading"><div><span class="eyebrow">YOUR DEVICE · LICENSED AUDIO</span><h2>My audio files <span id="localCount" class="counter">0</span></h2></div><button type="button" id="importMusicMore">+ Add files</button></div><p>Import MP3, M4A, or other supported audio you own or are licensed to use. Play with your phone's audio controls. Files are temporary and are never uploaded.</p><div id="localResults" class="local-grid"></div><input id="audioFiles" type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav" multiple hidden><p id="localHint">No audio imported yet. Tap “Import my audio” to try it.</p></section><footer>Powered by the official YouTube player · YouTube may show ads and controls playback availability. YouTube cannot be downloaded or played invisibly here.<br>Own audio stays on your device; background playback depends on your browser/OS. Playlists are saved only in this browser.</footer></main>
-<audio id="audioPlayer" preload="metadata" aria-label="Your imported audio" hidden></audio>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><meta name="theme-color" content="#080a0a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><meta name="description" content="Musikero — an elegant home for music discovery, personal playlists, and your licensed audio."><meta property="og:title" content="Musikero — Feel every note"><meta property="og:description" content="A beautifully crafted space for discovering music and finding your sound."><title>Musikero — Feel every note</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<aside class="sidebar" aria-label="Main navigation">
+  <a class="brand" href="/" aria-label="Musikero home">
+    <span class="brand-mark" aria-hidden="true"><span class="brand-wave"></span>m</span>
+    <span class="brand-type">musikero<span class="dot">.</span><small>YOUR SOUND, REIMAGINED</small></span>
+  </a>
+  <div class="side-category"><span>DISCOVER</span></div>
+  <nav aria-label="Music library">
+    <button type="button" data-view="all" class="active"><span class="nav-symbol">◈</span> Music library</button>
+    <button type="button" data-view="favorites"><span class="nav-symbol">♡</span> Favorites</button>
+  </nav>
+  <div class="section-label">YOUR COLLECTION <button type="button" id="newPlaylist" aria-label="Create playlist">＋</button></div>
+  <div id="playlists" aria-label="Your playlists"></div>
+  <div class="side-note"><div class="side-note-icon">♪</div><strong>Your music, your way.</strong><p>Discover new sounds and keep your favorite moments close. Library saved in this browser.</p></div>
+</aside>
+<main>
+<header class="topbar"><div class="breadcrumb"><span class="breadcrumb-line"></span><span>THE HOME OF YOUR SOUND</span></div><div class="topbar-actions"><span class="topbar-chip"><span class="online"></span> DISCOVER MUSIC</span><button id="settings" type="button" aria-label="About music playback">ⓘ &nbsp; How playback works</button></div></header><section class="hero" aria-labelledby="heroTitle">
+  <div class="hero-grain" aria-hidden="true"></div>
+  <div class="hero-copy">
+    <div class="pill"><span class="pill-spark"></span> AN ELEVATED LISTENING EXPERIENCE</div>
+    <h1 id="heroTitle">Music that<br><em>moves you.</em></h1>
+    <p>Find your next obsession. Rediscover your favorites. Make every moment sound extraordinary.</p>
+    <div class="hero-actions">
+      <button class="primary" id="addHero" type="button"><span aria-hidden="true">＋</span> Add a favorite</button>
+      <button type="button" id="exploreMusic" class="hero-secondary">Explore music <span aria-hidden="true">↗</span></button>
+    </div>
+    <div class="hero-footnote"><span class="hero-footnote-line"></span> DISCOVER <span class="hero-footnote-dot">✦</span> CURATE <span class="hero-footnote-dot">✦</span> LISTEN</div>
+  </div>
+  <div class="hero-art" aria-hidden="true">
+    <div class="art-halo halo-outer"></div>
+    <div class="art-halo halo-inner"></div>
+    <div class="album-sleeve">
+      <div class="sleeve-monogram">m<span>.</span></div>
+      <div class="sleeve-ridges"></div>
+      <div class="sleeve-copy"><small>MUSIKERO / VOL. 01</small><strong>FEEL<br>EVERY<br>NOTE.</strong></div>
+    </div>
+    <div class="record"><div class="record-center"><span>m.</span><small>33 ⅓ RPM</small></div></div>
+    <div class="art-float art-float-one">♪</div>
+    <div class="art-float art-float-two">✦</div>
+    <div class="art-caption">AN IMMERSIVE MUSIC SPACE · 2026</div>
+  </div>
+</section>
+<section class="search-area" id="discover" aria-labelledby="discoverTitle">
+  <div class="section-overline">FIND YOUR FREQUENCY</div>
+  <div class="discover-heading"><h2 id="discoverTitle">Discover your next <em>favorite.</em></h2><span>THE WORLD OF MUSIC, ONE SEARCH AWAY</span></div>
+  <form id="searchForm"><label class="sr-only" for="query">Search songs or artists</label><div class="search-input-wrap"><span class="search-glyph" aria-hidden="true">⌕</span><input id="query" placeholder="Search artists, tracks, moods…" aria-label="Search songs and artists" maxlength="100" required></div><select id="searchMode" aria-label="Search sorting"><option value="relevance">Best match</option><option value="date">Newest uploads</option></select><button type="submit" class="primary search-submit">Search <span aria-hidden="true">↗</span></button></form><p id="searchHint">Explore YouTube music through its official player. Ads and video availability are controlled by YouTube.</p><div class="quick-search" aria-label="Quick searches"><button type="button" data-search="OPM music">OPM</button><button type="button" data-search="P-pop music">P-pop</button><button type="button" data-search="K-pop music">K-pop</button><button type="button" data-search="lofi chill music">Chill</button><button type="button" data-search="new music 2026">New music</button></div></section>
+<div class="library-heading"><div><span class="eyebrow">YOUR SOUNDTRACK</span><h2 id="heading">Your music library</h2></div><div class="library-actions"><button id="importMusic" type="button">↑ Import my audio</button><button id="addSong">+ YouTube link</button></div></div><p id="status" role="status" aria-live="polite"></p><div id="results" class="grid"></div><div id="empty" class="empty"><div class="empty-icon">♫</div><h3>Something beautiful starts with a song.</h3><p>Save a favorite from YouTube or explore new music above.<br>Your next great listen is just one search away.</p><button id="emptyAdd" class="primary">Add your first song</button></div>
+<section class="own-music" id="ownMusic"><div class="library-heading"><div><span class="eyebrow">YOUR PERSONAL COLLECTION</span><h2>Private audio vault <span id="localCount" class="counter">0</span></h2></div><button type="button" id="importMusicMore">+ Add files</button></div><p>Bring in the songs you own or have permission to use. Your files stay on your device during this tab session; they are never uploaded.</p><div id="localResults" class="local-grid"></div><input id="audioFiles" type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav" multiple hidden><p id="localHint">Your vault is empty. Import your own audio to begin.</p></section><footer><div class="footer-brand"><span class="footer-glyph">m.</span> musikero <small>FEEL EVERY NOTE.</small></div><p>Discover music via the official YouTube player. YouTube may show ads; embedded videos cannot be downloaded or played in the background here. Your own audio stays on your device; phone lock-screen playback depends on your browser and operating system.</p></footer></main>
+<audio id="audioPlayer" preload="metadata" aria-label="Your personal audio" hidden></audio>
 <section id="playerPanel" hidden aria-label="Official YouTube video player">
   <div class="player-heading"><div><span class="eyebrow">IN-APP VIDEO PLAYER · YOUTUBE</span><h3 id="playingTitle">Now playing</h3></div><span class="live-tag">VIDEO</span></div>
   <div id="player"></div>
@@ -13,12 +56,12 @@
 </section>
 <aside id="queuePanel" class="queue-panel" hidden aria-label="Upcoming songs">
   <div class="queue-heading"><div><span class="eyebrow">YOUR LISTENING ORDER</span><h2>Play queue</h2></div><button id="closeQueue" type="button" aria-label="Close queue">×</button></div>
-  <p class="queue-explain">Pick a song to play inside Tambay. YouTube videos open in the visible official player.</p>
+  <p class="queue-explain">Pick a song to play inside Musikero. YouTube videos open in the visible official player.</p>
   <div id="queueItems"></div>
 </aside>
 <div id="queueBackdrop" hidden></div>
 <div id="bottomPlayer" class="bottom-player" aria-label="Music playback controls">
-  <div class="bar-track"><img id="barArtwork" alt="" src="/icon.svg"><div class="bar-track-text"><strong id="barTitle">Choose a song</strong><small id="barArtist">Your soundtrack starts here</small><span id="barSource" class="source-label">TAMBAY MUSIC</span></div><button id="barLike" class="icon-button" title="Favorite song" aria-label="Favorite song" aria-pressed="false" disabled>♡</button></div>
+  <div class="bar-track"><img id="barArtwork" alt="" src="/icon.svg"><div class="bar-track-text"><strong id="barTitle">Choose a song</strong><small id="barArtist">Every mood deserves a soundtrack</small><span id="barSource" class="source-label">MUSIKERO</span></div><button id="barLike" class="icon-button" title="Favorite song" aria-label="Favorite song" aria-pressed="false" disabled>♡</button></div>
   <div class="bar-center"><div class="transport">
     <button type="button" id="barPrev" aria-label="Previous song" title="Previous" disabled>⏮</button>
     <button type="button" id="barPlay" class="bar-play" aria-label="Play" disabled>▶</button>
@@ -29,4 +72,4 @@
 <dialog id="addDialog"><form id="addForm"><div class="dialog-heading"><h2>Add a song</h2><button type="button" data-close="addDialog" aria-label="Close">×</button></div><label>YouTube video link<input id="videoUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" required></label><label>Song title<input id="songTitle" maxlength="150" placeholder="Give this song a name" required></label><label>Artist <span>(optional)</span><input id="artist" maxlength="100" placeholder="Artist or channel"></label><p id="addError" role="alert"></p><button class="primary">Add to library</button></form></dialog>
 <dialog id="playlistDialog"><form id="playlistForm"><div class="dialog-heading"><h2>New playlist</h2><button type="button" data-close="playlistDialog" aria-label="Close">×</button></div><label>Playlist name<input id="playlistName" maxlength="60" required placeholder="Late night favorites"></label><button class="primary">Create playlist</button></form></dialog>
 <dialog id="assignDialog"><div class="dialog-heading"><h2>Add to playlist</h2><button data-close="assignDialog" aria-label="Close">×</button></div><div id="playlistChoices"></div></dialog>
-<dialog id="helpDialog"><div class="dialog-heading"><h2>About playback</h2><button data-close="helpDialog" aria-label="Close">×</button></div><p>YouTube search uses the server-side YouTube Data API key configured on Vercel. Videos open in the visible official YouTube player, which may contain ads. YouTube does not allow our app to download its videos, remove ads, or keep the embed playing while your screen is off.</p><p>For an ad-free experience with possible screen-off controls, use the <strong>Import my audio</strong> button for songs you own or are licensed to play. Those audio files are not sent to a server and disappear from the list when the tab reloads.</p><button class="primary" data-close="helpDialog">Got it</button></dialog><script src="app.js"></script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>
+<dialog id="helpDialog"><div class="dialog-heading"><h2>Music, on your terms.</h2><button data-close="helpDialog" aria-label="Close">×</button></div><p>Musikero discovers music with YouTube Data API and plays it with the visible official YouTube player. YouTube may serve ads, disable embedding for a video, and does not allow hidden background playback or downloading its music here.</p><p>For uninterrupted listening to audio you already own or are licensed to use, use <strong>Import my audio</strong>. Those audio files are not sent to a server and disappear from the list when the tab reloads.</p><button class="primary" data-close="helpDialog">Got it</button></dialog><script src="app.js"></script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>

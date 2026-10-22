@@ -1,12 +1,12 @@
 {
-  "name": "Tambay Music — Your music corner",
-  "short_name": "Tambay",
-  "description": "Discover YouTube music and play your own licensed audio",
+  "name": "Musikero — Feel Every Note",
+  "short_name": "Musikero",
+  "description": "An elegant music discovery space and a personal library for your licensed audio.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#111615",
-  "theme_color": "#111615",
+  "background_color": "#080a0a",
+  "theme_color": "#080a0a",
   "icons": [
     {
       "src": "/icon.svg",
