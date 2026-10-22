@@ -1,0 +1,9 @@
+{
+  "framework": null,
+  "outputDirectory": "dist",
+  "functions": {
+    "api/search.js": {
+      "maxDuration": 10
+    }
+  }
+}
