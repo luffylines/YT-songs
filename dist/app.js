@@ -129,6 +129,7 @@ function syncTransport(){
     $('barDownload').download=track.fileName;
   }else{$('barDownload').removeAttribute('href');}
   $('barQueue').disabled=playbackLength()===0;
+  if('mediaSession' in navigator){try{navigator.mediaSession.playbackState=isPlaying()?'playing':track?'paused':'none';}catch{}}
   syncProgress();
   if(!$('queuePanel').hidden)renderQueue();
 }
@@ -168,9 +169,16 @@ function showYoutube(song,autoplay=true){
   $('playingTitle').textContent=song.title;
   $('watchLink').href='https://www.youtube.com/watch?v='+song.id;
   $('playerStatus').textContent='Use the official player controls if your browser does not start playback automatically.';
-  if('mediaSession' in navigator){
-    try{navigator.mediaSession.metadata=null;
-      ['nexttrack','previoustrack','play','pause'].forEach(action=>navigator.mediaSession.setActionHandler(action,null));
+  if('mediaSession' in navigator && 'MediaMetadata' in window){
+    try{
+      navigator.mediaSession.metadata=new MediaMetadata({
+        title:song.title||'Unknown title',artist:song.artist||'YouTube',album:'Musikero · YouTube',
+        artwork:[{src:'https://i.ytimg.com/vi/'+song.id+'/hqdefault.jpg',sizes:'480x360',type:'image/jpeg'}]
+      });
+      navigator.mediaSession.setActionHandler('play',()=>togglePlayback());
+      navigator.mediaSession.setActionHandler('pause',()=>togglePlayback());
+      navigator.mediaSession.setActionHandler('nexttrack',()=>moveQueue(1));
+      navigator.mediaSession.setActionHandler('previoustrack',()=>moveQueue(-1));
     }catch{}
   }
   if(player?.loadVideoById){
