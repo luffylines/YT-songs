@@ -14,6 +14,8 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check dist/app.js
+          node --check dist/catalog.js
+          node --check api/catalog.js
           node --check api/search.js
           node --check dist/sw.js
       - name: Run smoke tests
