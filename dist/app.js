@@ -57,7 +57,7 @@ function render() {
     card.append(cover,node('h3',song.title),node('p',song.artist||'YouTube video'));
     const actions=node('div',undefined,'actions'),saved=state.songs.find(s=>s.id===song.id);
     const like=button(saved?.favorite?'♥':'♡',()=>{const s=addSong(song);s.favorite=!s.favorite;save();render();},'Toggle favorite for '+song.title);like.setAttribute('aria-pressed',String(!!saved?.favorite));like.classList.toggle('liked',!!saved?.favorite);
-    actions.append(like,button('Play next',()=>enqueueNext(song),'Queue '+song.title+' to play next'),button('+ Playlist',()=>assign(song)));\n    if(partySession) actions.append(button('♟ Party +',()=>partyAddSong(song),'Add '+song.title+' to the listening party queue'));
+    actions.append(like,button('Play next',()=>enqueueNext(song),'Queue '+song.title+' to play next'),button('+ Playlist',()=>assign(song)));\n    if(partySession) actions.append(button('🎉 Party +',()=>partyAddSong(song),'Add '+song.title+' to the listening party queue'));
     if(!saved)actions.append(button('Save',()=>{addSong(song);save();render();status('Added to your library.');}));
     else actions.append(button(list?'Remove':'Delete',()=>{if(list)list.songs=list.songs.filter(id=>id!==song.id);else{state.songs=state.songs.filter(s=>s.id!==song.id);state.playlists.forEach(p=>p.songs=p.songs.filter(id=>id!==song.id));}save();render();status(list?'Removed from playlist.':'Removed from library.');}));
     card.append(actions);$('results').append(card);
@@ -609,8 +609,8 @@ async function partyRefresh(){
 }
 $('barParty').onclick=()=>{
   partyError('');
-  if(partySession){showDialog('partyDialog');partyRefresh();}
-  else showDialog('partyDialog');
+  if(!$('partyDialog').open)showDialog('partyDialog');
+  if(partySession)partyRefresh();
 };
 $('partyCreate').onclick=partyCreate;
 $('partyJoinToggle').onclick=()=>{$('partyJoinForm').hidden=!$('partyJoinForm').hidden;};
