@@ -51,3 +51,33 @@ function mockResponse(){
     else process.env.YOUTUBE_API_KEY=oldKey;
   }
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+
+const styles=fs.readFileSync('dist/style.css','utf8');
+for(const id of ['bottomPlayer','barPlay','barPrev','barNext','barQueue','queuePanel','queueItems','playerPanel','player','seekSlider','audioPlayer','barArtwork','barTitle','barArtist']){
+  assert.ok(html.includes('id="'+id+'"'),'Player UI missing: '+id);
+}
+assert.match(source,/function syncTransport\(\)/);
+assert.match(source,/function renderQueue\(\)/);
+assert.match(source,/function showYoutube\(song,autoplay=true\)/);
+assert.match(source,/playerVars:\{playsinline:1,origin:location.origin,controls:1\}/);
+assert.match(source,/if\(document.hidden&&activeSource==='youtube'\)player\?\.pauseVideo/);
+assert.match(styles,/\.bottom-player\{position:fixed/);
+assert.match(styles,/#player\{height:230px;min-height:200px/);
+assert.match(styles,/@media\(max-width:700px\)/);
+assert.doesNotMatch(source,/audioPanel|closePlayer|nextAudio|prevAudio/);
+const mover=source.slice(source.indexOf('function moveQueue(delta)'),source.indexOf('function togglePlayback()'));
+assert.ok(mover.startsWith('function moveQueue(delta)'),'Queue movement handler missing');
+const moves=vm.runInNewContext(`(()=>{
+ let activeSource='youtube',queuePosition=0,youtubeQueue=[{id:'first'},{id:'second'}],localTracks=[],activeAudio=-1;
+ let history=[],showYoutube=(song)=>history.push(song.id),playLocal=()=>{};
+ ${mover}
+ return {next:moveQueue(1),pastEnd:moveQueue(1),prev:moveQueue(-1),pastStart:moveQueue(-1),history,queuePosition};
+})()`);
+assert.equal(moves.next,true);
+assert.equal(moves.pastEnd,false);
+assert.equal(moves.prev,true);
+assert.equal(moves.pastStart,false);
+assert.deepEqual(Array.from(moves.history),['second','first']);
+assert.equal(moves.queuePosition,0);
+console.log('PASS: permanent music dock, visible YouTube player, queue bounds, and mobile layout');
