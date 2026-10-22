@@ -154,7 +154,7 @@ assert.match(styles,/rotateY\(-20deg\)/);
 assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
 assert.match(styles,/@media\(max-width:700px\)/);
 assert.match(icon,/<title id="title">Musikero<\/title>/);
-assert.match(sw,/musikero-shell-v1/);
+assert.match(sw,/musikero-shell-v2/);
 assert.match(source,/getItem\('musikero-v1'\) \|\| localStorage\.getItem\('tambay-v1'\)/);
 assert.match(source,/setItem\('musikero-v1'/);
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
