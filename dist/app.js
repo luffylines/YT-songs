@@ -205,7 +205,7 @@ window.onYouTubeIframeAPIReady=()=>{
         syncTransport();
       },
       onStateChange:e=>{
-        if(e.data===1&&(document.hidden||activeSource!=='youtube')){
+        if(e.data===1&&activeSource!=='youtube'){
           player.pauseVideo();return;
         }
         if(activeSource==='youtube'){
@@ -290,9 +290,8 @@ $('seekSlider').oninput=()=>{
   const duration=activeSource==='youtube'?(Number(player?.getDuration?.())||0):(Number(audio.duration)||0);
   $('barTime').textContent=clock(duration*Number($('seekSlider').value)/1000);
 };
-document.addEventListener('visibilitychange',()=>{
-  if(document.hidden&&activeSource==='youtube')player?.pauseVideo?.();
-});
+// Do not forcibly pause audio when the page becomes hidden. Browser and
+// operating-system background playback policies still apply.
 setInterval(syncProgress,1000);
 
 // Play streams directly from the independent music provider. Do not cache or offer downloads.
