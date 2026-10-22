@@ -272,10 +272,26 @@ function togglePlayback(){
       $('playerStatus').textContent='YouTube player is loading. Tap play once it appears.';
       return;
     }
-    try{if(player.getPlayerState()===1)player.pauseVideo();else if(!document.hidden)player.playVideo();}catch{}
+    try{
+      const state=player.getPlayerState();
+      if(state===1 || state===3){
+        player.pauseVideo();
+        youtubeIsPlaying=false;
+        if('mediaSession' in navigator){try{navigator.mediaSession.playbackState='paused';}catch{}}
+      }else{
+        if(document.hidden){status('Return to this tab once to start YouTube playback.');return;}
+        player.playVideo();
+      }
+      syncTransport();
+    }catch{status('Unable to control YouTube playback. Try again.');}
   }else if(activeSource==='local'||activeSource==='catalog'){
-    if(audio.paused)audio.play().catch(()=>status('Tap the play button to allow audio.'));
-    else audio.pause();
+    if(audio.paused){
+      const attempt=audio.play();
+      if(attempt&&typeof attempt.catch==='function')attempt.catch(()=>status('Tap Play to allow audio playback.'));
+    }else{
+      audio.pause();
+      syncTransport();
+    }
   }
 }
 $('barPlay').onclick=togglePlayback;
