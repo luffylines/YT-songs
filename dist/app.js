@@ -57,7 +57,7 @@ function render() {
     card.append(cover,node('h3',song.title),node('p',song.artist||'YouTube video'));
     const actions=node('div',undefined,'actions'),saved=state.songs.find(s=>s.id===song.id);
     const like=button(saved?.favorite?'♥':'♡',()=>{const s=addSong(song);s.favorite=!s.favorite;save();render();},'Toggle favorite for '+song.title);like.setAttribute('aria-pressed',String(!!saved?.favorite));like.classList.toggle('liked',!!saved?.favorite);
-    actions.append(like,button('Play next',()=>enqueueNext(song),'Queue '+song.title+' to play next'),button('+ Playlist',()=>assign(song)));
+    actions.append(like,button('Play next',()=>enqueueNext(song),'Queue '+song.title+' to play next'),button('+ Playlist',()=>assign(song)));\n    if(partySession) actions.append(button('♟ Party +',()=>partyAddSong(song),'Add '+song.title+' to the listening party queue'));
     if(!saved)actions.append(button('Save',()=>{addSong(song);save();render();status('Added to your library.');}));
     else actions.append(button(list?'Remove':'Delete',()=>{if(list)list.songs=list.songs.filter(id=>id!==song.id);else{state.songs=state.songs.filter(s=>s.id!==song.id);state.playlists.forEach(p=>p.songs=p.songs.filter(id=>id!==song.id));}save();render();status(list?'Removed from playlist.':'Removed from library.');}));
     card.append(actions);$('results').append(card);
@@ -501,6 +501,145 @@ $('audioFiles').onchange=e=>{
   status(localTracks.length?'Your audio is ready. Imported files remain on this device, in this tab.':'No supported audio files were selected.');
 };
 window.addEventListener('beforeunload',()=>localTracks.forEach(t=>URL.revokeObjectURL(t.url)));
+
+/* Listening Party: server-backed shared room, host moderation, and a shared queue. */
+const PARTY_ENDPOINT='https://xfuwswyyvbpbuuftggkf.supabase.co/functions/v1/musikero-party';
+const PARTY_PUBLIC_KEY='sb_publishable_pKo1y2tEB94NklL5szhqjg_K4xEic4r';
+let partySession=null, partyPollBusy=false, partySeenQueue=new Set(), partyPollTimer=null;
+try{const savedParty=JSON.parse(localStorage.getItem('musikero-party-session')||'null');if(savedParty?.partyId&&savedParty?.token&&savedParty?.role)partySession=savedParty;}catch{}
+async function partyRequest(action,extra={}){
+  const body={action,...extra};
+  if(partySession){body.partyId=partySession.partyId;body.token=partySession.token;}
+  const res=await fetch(PARTY_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','apikey':PARTY_PUBLIC_KEY},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(data.error||'Party request failed.');
+  return data;
+}
+function partyError(message=''){ $('partyError').textContent=message; }
+function partySetSession(session){
+  partySession=session;
+  partySeenQueue=new Set();
+  try{if(session)localStorage.setItem('musikero-party-session',JSON.stringify(session));else localStorage.removeItem('musikero-party-session');}catch{}
+  $('partyStart').hidden=!!session;$('partyRoom').hidden=!session;
+  $('barParty').classList.toggle('party-active',!!session);
+  $('barParty').setAttribute('aria-label',session?'Open active listening party':'Create or join a listening party');
+  render();
+  if(session)partyRefresh();
+}
+async function partyCreate(){
+  partyError('');
+  const name=$('partyName').value.trim();
+  try{
+    const data=await partyRequest('create',{name});
+    partySetSession({partyId:data.party.id,code:data.party.code,token:data.party.hostToken,role:'host',name:data.party.host_name});
+  }catch(e){partyError(e.message);}
+}
+async function partyJoin(e){
+  e.preventDefault();partyError('');
+  const name=$('partyName').value.trim(),code=$('partyCode').value.replace(/\D/g,'').slice(0,6);
+  try{
+    const data=await partyRequest('join',{name,code});
+    partySetSession({partyId:data.party.id,code:data.party.code,token:data.memberToken,role:'guest',name:data.member.name});
+  }catch(err){partyError(err.message);}
+}
+async function partyAddSong(song){
+  if(!partySession){showDialog('partyDialog');partyError('Create or join a party first.');return;}
+  try{
+    await partyRequest('add',{youtubeId:song.id,title:song.title,artist:song.artist||'YouTube'});
+    $('partyStatus').textContent='Added “'+song.title+'” to the shared queue.';
+    await partyRefresh();
+  }catch(e){partyError(e.message);showDialog('partyDialog');}
+}
+function partyRender(data){
+  $('partyCodeDisplay').textContent=data.party.code;
+  $('partyMemberCount').textContent=(data.members.length)+' member'+(data.members.length===1?'':'s');
+  $('partyClose').hidden=data.role!=='host';
+  $('partyLeave').textContent=data.role==='host'?'Close party':'Leave party';
+  $('partyMembers').replaceChildren();
+  data.members.forEach(member=>{
+    const row=node('div',undefined,'party-member');
+    const avatar=node('span',member.role==='host'?'♛':'♟','party-avatar');
+    const details=node('span',undefined,'party-member-copy');details.append(node('strong',member.name),node('small',member.role==='host'?'HOST':'GUEST'));
+    row.append(avatar,details);
+    if(data.role==='host'&&member.role==='guest')row.append(button('Remove',async()=>{try{await partyRequest('remove-member',{memberId:member.id});await partyRefresh();}catch(e){partyError(e.message);}},'Remove '+member.name+' from party'));
+    $('partyMembers').append(row);
+  });
+  $('partyQueue').replaceChildren();
+  if(!data.queue.length)$('partyQueue').append(node('p','No songs yet. Add one from YouTube search using ♟ Party +.'));
+  data.queue.forEach((track,index)=>{
+    const row=node('div',undefined,'party-queue-item');
+    const thumb=node('img');thumb.src='https://i.ytimg.com/vi/'+track.youtube_id+'/mqdefault.jpg';thumb.alt='';thumb.loading='lazy';
+    const copy=node('span',undefined,'party-queue-copy');copy.append(node('strong',track.title),node('small',track.artist+' · added by '+track.added_by));
+    row.append(thumb,copy,button('▶',()=>{
+      const song={id:track.youtube_id,title:track.title,artist:track.artist};
+      if(data.role==='host'){
+        if(!youtubeQueue.some(s=>s.id===song.id))youtubeQueue.push(song);
+        queuePosition=youtubeQueue.findIndex(s=>s.id===song.id);
+        showYoutube(song,true);
+      }else{
+        play(song,[...data.queue.map(q=>({id:q.youtube_id,title:q.title,artist:q.artist})),song]);
+      }
+    },'Play '+track.title));
+    $('partyQueue').append(row);
+  });
+}
+async function partyRefresh(){
+  if(!partySession||partyPollBusy)return;
+  partyPollBusy=true;
+  try{
+    const data=await partyRequest('state');
+    if(partySession.role==='host'){
+      for(const track of data.queue){
+        if(!partySeenQueue.has(track.id)){
+          partySeenQueue.add(track.id);
+          const song={id:track.youtube_id,title:track.title,artist:track.artist};
+          if(activeSource==='youtube'&&pendingVideo?.id!==song.id&&!youtubeQueue.some(s=>s.id===song.id)){
+            priorityQueue.push(song);
+          }
+        }
+      }
+    }else data.queue.forEach(track=>partySeenQueue.add(track.id));
+    partyRender(data);
+    if(!$('partyDialog').open) $('partyStatus').textContent='Party connected · queue refreshes automatically.';
+  }catch(e){
+    if(/ended|removed|session expired/i.test(e.message)){
+      partySetSession(null);partyError(e.message);
+    }else $('partyStatus').textContent='Reconnecting…';
+  }finally{partyPollBusy=false;}
+}
+$('barParty').onclick=()=>{
+  partyError('');
+  if(partySession){showDialog('partyDialog');partyRefresh();}
+  else showDialog('partyDialog');
+};
+$('partyCreate').onclick=partyCreate;
+$('partyJoinToggle').onclick=()=>{$('partyJoinForm').hidden=!$('partyJoinForm').hidden;};
+$('partyJoinForm').onsubmit=partyJoin;
+$('partyCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('partyCodeDisplay').textContent);$('partyStatus').textContent='Party code copied. Send it to your friends.';}catch{$('partyStatus').textContent='Your party code is '+$('partyCodeDisplay').textContent+'. Copy it manually.';}};
+$('partyClose').onclick=async()=>{
+  if(!partySession||partySession.role!=='host')return;
+  if(!confirm('End this party for everyone?'))return;
+  try{await partyRequest('close');partySetSession(null);partyError('Party ended.');}catch(e){partyError(e.message);}
+};
+$('partyLeave').onclick=async()=>{
+  if(!partySession)return;
+  try{
+    if(partySession.role==='host')await partyRequest('close');
+    else await partyRequest('leave');
+    partySetSession(null);$('partyStatus').textContent='You left the party.';
+  }catch(e){partyError(e.message);}
+};
+if(partySession){
+  $('partyStart').hidden=true;$('partyRoom').hidden=false;
+  $('barParty').classList.add('party-active');
+  $('barParty').setAttribute('aria-label','Open active listening party');
+  partyPollTimer=setInterval(partyRefresh,4000);
+  window.addEventListener('storage',e=>{if(e.key==='musikero-party-session'&&!e.newValue)partySetSession(null);});
+  setTimeout(partyRefresh,500);
+}else{
+  $('partyRoom').hidden=true;
+}
+
 renderLocal();
 render();
 showSectionView();
