@@ -212,3 +212,28 @@ dialog input{margin-top:7px}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+/* Keep the official YouTube player out of the document flow so it doesn't
+   push the library and playlist content down the page. */
+#playerPanel:not([hidden]){
+  position:fixed;
+  z-index:35;
+  right:22px;
+  bottom:118px;
+  width:min(420px,calc(100vw - 28px));
+  max-height:calc(100vh - 170px);
+  overflow:auto;
+  padding:16px;
+  border:1px solid rgba(186,232,196,.22);
+  border-radius:18px;
+  background:rgba(10,16,12,.97);
+  box-shadow:0 22px 70px rgba(0,0,0,.62);
+  backdrop-filter:blur(18px);
+}
+#playerPanel .player-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#playerPanel h3{font-size:15px;margin:4px 0 10px}
+#playerPanel #player iframe{display:block;width:100%;max-width:100%;aspect-ratio:16/9;height:auto;border-radius:10px}
+#playerPanel .video-caption{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#playerPanel .video-caption p{font-size:11px}
+@media(max-width:760px){
+  #playerPanel:not([hidden]){right:10px;bottom:150px;width:min(390px,calc(100vw - 20px));padding:12px}
+}
