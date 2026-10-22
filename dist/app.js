@@ -24,7 +24,18 @@ function node(tag, text, className) { const e=document.createElement(tag); if(te
 function button(text, action, label) { const e=node('button',text); e.type='button'; e.onclick=action; if(label)e.setAttribute('aria-label',label); return e; }
 function showDialog(id) { $(id).showModal(); }
 function addSong(song) { if(!state.songs.some(s=>s.id===song.id))state.songs.push({...song,favorite:false}); return state.songs.find(s=>s.id===song.id); }
-function setView(next) { view=next;query='';$('query').value='';searchResults=null;requestVersion++;status('');render(); }
+function setView(next) { view=next;query='';$('query').value='';searchResults=null;requestVersion++;status('');render(); showSectionView(); }
+function showSectionView(){
+  const independent=view==='independent';
+  $('heroTitle').closest('.hero').hidden=independent;
+  $('discover').hidden=independent;
+  $('catalogSection').hidden=!independent;
+  $('heading').closest('.library-heading').hidden=independent;
+  $('status').hidden=independent;
+  $('results').hidden=independent;
+  $('empty').hidden=independent||visibleSongs.length>0;
+  $('ownMusic').hidden=independent;
+}
 function render() {
   document.querySelectorAll('[data-view]').forEach(e=>e.classList.toggle('active',e.dataset.view===view));
   $('playlists').replaceChildren();
@@ -32,6 +43,7 @@ function render() {
   const create=button('+ New playlist',()=>showDialog('playlistDialog'));$('playlists').append(create);
   const list=state.playlists.find(p=>p.id===view);
   $('heading').textContent=searchResults?'Fresh discoveries':view==='favorites'?'Your favorites':list?list.name:'Your music library';
+  showSectionView();
   let songs=searchResults || state.songs.filter(s=>view==='all'||view==='favorites'&&s.favorite||list?.songs.includes(s.id));
   if(!searchResults && query)songs=songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(query.toLowerCase()));
   visibleSongs=songs.slice();
@@ -324,9 +336,21 @@ window.MusikeroAudio=Object.freeze({
 });
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$('showIndependent').onclick=()=>setView('independent');
 ['addHero','addSong','emptyAdd'].forEach(id=>$(id).onclick=()=>showDialog('addDialog'));
 $('newPlaylist').onclick=()=>showDialog('playlistDialog');
-$('addForm').onsubmit=e=>{e.preventDefault();const id=parseVideo($('videoUrl').value.trim());if(!id){$('addError').textContent='Enter a valid YouTube video link (watch, shorts, live, or youtu.be).';return;}const title=$('songTitle').value.trim();if(!title){$('addError').textContent='Enter a song title.';return;}addSong({id,title,artist:$('artist').value.trim()});save();$('addDialog').close();e.target.reset();$('addError').textContent='';setView('all');status('Song added. Select its thumbnail to open the player.');};
+async function autofillVideoMetadata(){
+ const id=parseVideo($('videoUrl').value.trim());if(!id)return;
+ $('addError').textContent='Looking up title and artist…';
+ try{const r=await fetch('/api/video?id='+encodeURIComponent(id));const d=await r.json();if(!r.ok)throw new Error();
+ if(!$('songTitle').value.trim())$('songTitle').value=d.title||'';
+ if(!$('artist').value.trim())$('artist').value=d.artist||'';
+ $('addError').textContent='Details filled in. You can edit them before saving.';
+ }catch{$('addError').textContent='Auto-detection failed; you can enter the details manually.';}
+}
+$('videoUrl').addEventListener('change',autofillVideoMetadata);
+$('videoUrl').addEventListener('paste',()=>setTimeout(autofillVideoMetadata,0));
+$('addForm').onsubmit=e=>{e.preventDefault();const id=parseVideo($('videoUrl').value.trim());if(!id){$('addError').textContent='Enter a valid YouTube video link (watch, shorts, live, or youtu.be).';return;}const title=$('songTitle').value.trim();if(!title){$('addError').textContent='Enter a song title.';return;}addSong({id,title,artist:$('artist').value.trim()});save();$('addDialog').close();e.target.reset();$('addError').textContent='';setView('all');status('Song added. Your library is saved in this browser.');};
 $('playlistForm').onsubmit=e=>{e.preventDefault();const name=$('playlistName').value.trim();if(!name)return;const p={id:crypto.randomUUID(),name,songs:[]};state.playlists.push(p);save();$('playlistDialog').close();e.target.reset();setView(p.id);};
 $('settings').onclick=()=>showDialog('helpDialog');
 $('exploreMusic').onclick=()=>{document.getElementById('discover').scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});$('query').focus({preventScroll:true});};
@@ -425,4 +449,5 @@ $('audioFiles').onchange=e=>{
 window.addEventListener('beforeunload',()=>localTracks.forEach(t=>URL.revokeObjectURL(t.url)));
 renderLocal();
 render();
+showSectionView();
 syncTransport();
