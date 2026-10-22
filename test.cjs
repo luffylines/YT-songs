@@ -44,6 +44,60 @@ function mockResponse(){
     ({out,res}=mockResponse());
     await searchHandler({method:'GET',query:{q:'OPM'}},res);
     assert.equal(out.code,429);
+
+    const catalogHandler=require('./api/catalog.js');
+    const oldJamendo=process.env.JAMENDO_CLIENT_ID;
+    try{
+      delete process.env.JAMENDO_CLIENT_ID;
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{}},res);
+      assert.equal(out.code,503,'no fake music without client ID');
+      process.env.JAMENDO_CLIENT_ID='private-test-id';
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{page:'0'}},res);
+      assert.equal(out.code,400);
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{genre:'invalid'}},res);
+      assert.equal(out.code,400);
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{track:'bad'}},res);
+      assert.equal(out.code,400);
+      const recorded=[];
+      global.fetch=async url=>{
+        const req=new URL(url);recorded.push(req);
+        assert.equal(req.hostname,'api.jamendo.com');
+        assert.equal(req.searchParams.get('client_id'),'private-test-id');
+        return {ok:true,json:async()=>({
+          headers:{status:'success'},
+          results:[{id:'12345',name:'Fresh Track',artist_name:'Independent Artist',image:'https://usercontent.jamendo.com/a.jpg',audio:'https://prod-1.storage.jamendo.com/12345.mp3',shareurl:'https://www.jamendo.com/track/12345',releasedate:'2026-10-22'},{
+            id:'12346',name:'Untrusted',audio:'https://evil.example/12346.mp3',shareurl:'https://evil.example/track/12346'}]
+        })};
+      };
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{page:'2',sort:'new'}},res);
+      assert.equal(out.code,200);
+      assert.equal(recorded.at(-1).searchParams.get('offset'),'40');
+      assert.equal(recorded.at(-1).searchParams.get('order'),'releasedate_desc');
+      assert.equal(out.body.items.length,1);
+      assert.equal(out.body.items[0].id,'jm-12345');
+      assert.equal(JSON.stringify(out.body).includes('private-test-id'),false);
+      assert.equal(JSON.stringify(out.body).includes('evil.example'),false);
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{q:'jazz',genre:'jazz'}},res);
+      assert.equal(recorded.at(-1).searchParams.get('search'),'jazz');
+      assert.equal(recorded.at(-1).searchParams.get('order'),'relevance');
+      ({out,res}=mockResponse());
+      await catalogHandler({method:'GET',query:{track:'12345',page:'5'}},res);
+      assert.equal(out.code,200);
+      assert.equal(recorded.at(-1).searchParams.get('id'),'12345');
+      assert.equal(recorded.at(-1).searchParams.get('limit'),'1');
+      assert.equal(out.body.hasMore,false);
+      console.log('PASS: non-commercial catalog validation, paginated 2K support, stream URL safety and on-demand track refresh');
+    }finally{
+      if(oldJamendo===undefined)delete process.env.JAMENDO_CLIENT_ID;
+      else process.env.JAMENDO_CLIENT_ID=oldJamendo;
+    }
+
     console.log('PASS: API key safety, validation, search mapping, and quota errors');
   }finally{
     global.fetch=originalFetch;
@@ -106,3 +160,23 @@ assert.match(source,/setItem\('musikero-v1'/);
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(ids.length,new Set(ids).size,'duplicate HTML ID');
 console.log('PASS: Musikero branding, luxury 3D design, mobile accessibility and saved-playlist migration');
+
+const catalogScript=fs.readFileSync('dist/catalog.js','utf8');
+const catalogApi=fs.readFileSync('api/catalog.js','utf8');
+const shell=fs.readFileSync('dist/sw.js','utf8');
+for(const [,id] of catalogScript.matchAll(/el\('([^']+)'\)/g))
+  assert.ok(html.includes('id="'+id+'"'),'Missing catalog UI: '+id);
+for(const id of ['catalogSection','catalogResults','catalogMore','catalogQuery','catalogForm','catalogStatus','catalogCount','showIndependent']){
+  assert.ok(html.includes('id="'+id+'"'),'Missing music catalog control: '+id);
+}
+assert.match(source,/window\.MusikeroAudio=Object\.freeze/);
+assert.match(source,/navigator\.mediaSession\.setActionHandler\('nexttrack'/);
+assert.match(catalogScript,/musikero-indie-favorites-v1/);
+assert.match(catalogScript,/localStorage\.setItem\(STORAGE_KEY/);
+assert.doesNotMatch(catalogScript,/localStorage\.setItem\([^)]*\.audio/);
+assert.match(catalogApi,/const PAGE_SIZE=40;/);
+assert.match(shell, /if\(url\.origin!==self\.location\.origin \|\| url\.pathname\.startsWith\('\/api\/'\)\)return;/);
+assert.ok(shell.includes("'/catalog.js'"));
+assert.ok(html.includes('Music via Jamendo'));
+assert.ok(styles.includes('.catalog-section{'));
+console.log('PASS: independent music UI, mobile styles, catalog metadata-only favorites and offline audio exclusions');
