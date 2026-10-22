@@ -4,6 +4,9 @@
   "functions": {
     "api/search.js": {
       "maxDuration": 10
+    },
+    "api/catalog.js": {
+      "maxDuration": 10
     }
   }
 }
