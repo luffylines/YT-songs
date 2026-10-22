@@ -10,7 +10,7 @@ function parseVideo(value) {
   } catch { return null; }
 }
 let state = {songs:[], playlists:[]}, view = 'all', query = '', searchResults = null, player = null, pendingVideo = null, selectedSong = null, requestVersion = 0;
-let visibleSongs = [], youtubeQueue = [], queuePosition = -1, activeSource = null, youtubeIsPlaying = false;
+let visibleSongs = [], youtubeQueue = [], priorityQueue = [], queuePosition = -1, activeSource = null, youtubeIsPlaying = false;
 // Independent artist streaming stays in memory; never persist provider audio URLs or cache media.
 let catalogQueue = [], catalogPosition = -1;
 // Preserve music collections from older Tambay installations during the Musikero rebrand.
@@ -57,7 +57,7 @@ function render() {
     card.append(cover,node('h3',song.title),node('p',song.artist||'YouTube video'));
     const actions=node('div',undefined,'actions'),saved=state.songs.find(s=>s.id===song.id);
     const like=button(saved?.favorite?'♥':'♡',()=>{const s=addSong(song);s.favorite=!s.favorite;save();render();},'Toggle favorite for '+song.title);like.setAttribute('aria-pressed',String(!!saved?.favorite));like.classList.toggle('liked',!!saved?.favorite);
-    actions.append(like,button('+ Playlist',()=>assign(song)));
+    actions.append(like,button('Play next',()=>enqueueNext(song),'Queue '+song.title+' to play next'),button('+ Playlist',()=>assign(song)));
     if(!saved)actions.append(button('Save',()=>{addSong(song);save();render();status('Added to your library.');}));
     else actions.append(button(list?'Remove':'Delete',()=>{if(list)list.songs=list.songs.filter(id=>id!==song.id);else{state.songs=state.songs.filter(s=>s.id!==song.id);state.playlists.forEach(p=>p.songs=p.songs.filter(id=>id!==song.id));}save();render();status(list?'Removed from playlist.':'Removed from library.');}));
     card.append(actions);$('results').append(card);
@@ -163,6 +163,13 @@ function closeQueue(){
   $('queuePanel').hidden=true;$('queueBackdrop').hidden=true;
   $('barQueue').setAttribute('aria-expanded','false');
 }
+function enqueueNext(song){
+  if(!validId(song?.id))return;
+  priorityQueue=priorityQueue.filter(item=>item.id!==song.id);
+  priorityQueue.unshift(song);
+  status('Added to play next: '+song.title);
+  syncTransport();
+}
 function showYoutube(song,autoplay=true){
   if(!validId(song?.id))return;
   audio.pause();
@@ -206,7 +213,14 @@ window.onYouTubeIframeAPIReady=()=>{
     width:'100%',height:'230',videoId:pendingVideo?.id,
     playerVars:{playsinline:1,origin:location.origin,controls:1},
     events:{
-      onError:()=>{$('playerStatus').textContent='Embedding is unavailable for this video. You can try a different song or use the YouTube link.';},
+      onError:e=>{
+        const code=e?.data;
+        const restricted=code===101||code===150;
+        $('playerStatus').textContent=restricted
+          ? 'This video is restricted from embedded playback. Skipping to the next queued song when available.'
+          : 'This video cannot play in the embedded player. Skipping to the next queued song when available.';
+        if(!moveQueue(1))status('Could not play this YouTube video. Try another song or choose Independent Music.');
+      },
       onReady:()=>{
         if(activeSource==='youtube'&&pendingVideo&&!document.hidden){
           player.cueVideoById(pendingVideo.id);
@@ -229,6 +243,13 @@ window.onYouTubeIframeAPIReady=()=>{
 };
 function moveQueue(delta){
   if(activeSource==='youtube'){
+    if(delta>0&&priorityQueue.length){
+      const nextSong=priorityQueue.shift();
+      youtubeQueue=youtubeQueue.filter(item=>item.id!==nextSong.id);
+      youtubeQueue.splice(Math.max(0,queuePosition+1),0,nextSong);
+      queuePosition=youtubeQueue.findIndex(item=>item.id===nextSong.id);
+      showYoutube(nextSong,true);return true;
+    }
     const next=queuePosition+delta;
     if(next<0||next>=youtubeQueue.length)return false;
     queuePosition=next;showYoutube(youtubeQueue[next],true);return true;
