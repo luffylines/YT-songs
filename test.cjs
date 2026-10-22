@@ -81,3 +81,28 @@ assert.equal(moves.pastStart,false);
 assert.deepEqual(Array.from(moves.history),['second','first']);
 assert.equal(moves.queuePosition,0);
 console.log('PASS: permanent music dock, visible YouTube player, queue bounds, and mobile layout');
+
+
+const manifest=JSON.parse(fs.readFileSync('dist/manifest.webmanifest','utf8'));
+const icon=fs.readFileSync('dist/icon.svg','utf8');
+const sw=fs.readFileSync('dist/sw.js','utf8');
+assert.equal(manifest.short_name,'Musikero');
+assert.equal(manifest.theme_color,'#080a0a');
+assert.match(html,/<title>Musikero — Feel every note<\/title>/i);
+assert.match(html,/class="hero-art"/);
+assert.match(html,/class="album-sleeve"/);
+assert.match(html,/class="record"/);
+assert.match(html,/id="exploreMusic"/);
+assert.doesNotMatch(html,/Tambay/i);
+assert.match(styles,/--bg:#080a0a/);
+assert.match(styles,/perspective:1000px;transform-style:preserve-3d/);
+assert.match(styles,/rotateY\(-20deg\)/);
+assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
+assert.match(styles,/@media\(max-width:700px\)/);
+assert.match(icon,/<title id="title">Musikero<\/title>/);
+assert.match(sw,/musikero-shell-v1/);
+assert.match(source,/getItem\('musikero-v1'\) \|\| localStorage\.getItem\('tambay-v1'\)/);
+assert.match(source,/setItem\('musikero-v1'/);
+const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
+assert.equal(ids.length,new Set(ids).size,'duplicate HTML ID');
+console.log('PASS: Musikero branding, luxury 3D design, mobile accessibility and saved-playlist migration');
