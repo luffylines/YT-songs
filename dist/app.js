@@ -105,7 +105,7 @@ function syncTransport(){
   $('barArtwork').src=youtube&&track ? 'https://i.ytimg.com/vi/'+track.id+'/mqdefault.jpg' : activeSource==='catalog'&&track?.image ? track.image : '/icon.svg';
   $('barSource').textContent=!track?'MUSIKERO':youtube?'YOUTUBE · IN-APP PLAYER':activeSource==='catalog'?'INDEPENDENT MUSIC · JAMENDO':'MY AUDIO · THIS DEVICE';
   $('barPlay').disabled=!track;
-  $('barPlay').textContent=isPlaying()?'❚❚':'▶';
+  $('barPlay').innerHTML=isPlaying()?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.4" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1.4" fill="currentColor"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8a1.2 1.2 0 0 1 1.8-1l11 6.7a1.8 1.8 0 0 1 0 3L8.8 20.2A1.2 1.2 0 0 1 7 19.2z" fill="currentColor"/></svg>';
   $('barPlay').setAttribute('aria-label',isPlaying()?'Pause':'Play');
   const index=youtube?queuePosition:activeSource==='catalog'?catalogPosition:activeAudio;
   $('barPrev').disabled=!track||index<=0;
