@@ -36,7 +36,7 @@ function showSectionView(){
   $('results').hidden=!library;
   $('empty').hidden=!library||visibleSongs.length>0;
   $('ownMusic').hidden=!library;
-  $('searchArea')?.setAttribute('hidden','');
+  if($('searchArea')) $('searchArea').hidden=view!=='all';
 }
 function render() {
   document.querySelectorAll('[data-view]').forEach(e=>e.classList.toggle('active',e.dataset.view===view));
