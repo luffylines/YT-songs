@@ -191,7 +191,7 @@ function showYoutube(song,autoplay=true){
     }catch{}
   }
   if(player?.loadVideoById){
-    if(autoplay&&!document.hidden)player.loadVideoById(song.id);
+    if(autoplay)player.loadVideoById(song.id);
     else player.cueVideoById(song.id);
   }else if(!apiLoading){
     apiLoading=true;
@@ -222,9 +222,10 @@ window.onYouTubeIframeAPIReady=()=>{
         if(!moveQueue(1))status('Could not play this YouTube video. Try another song or choose Independent Music.');
       },
       onReady:()=>{
-        if(activeSource==='youtube'&&pendingVideo&&!document.hidden){
-          player.cueVideoById(pendingVideo.id);
-          $('playerStatus').textContent='Tap ▶ in the player or bottom bar to start music.';
+        if(activeSource==='youtube'&&pendingVideo){
+          if(youtubeIsPlaying) player.playVideo();
+          else player.cueVideoById(pendingVideo.id);
+          $('playerStatus').textContent='Playback is controlled by YouTube and your browser. Background playback availability depends on the device and browser.';
         }else player.pauseVideo();
         syncTransport();
       },
@@ -279,7 +280,6 @@ function togglePlayback(){
         youtubeIsPlaying=false;
         if('mediaSession' in navigator){try{navigator.mediaSession.playbackState='paused';}catch{}}
       }else{
-        if(document.hidden){status('Return to this tab once to start YouTube playback.');return;}
         player.playVideo();
       }
       syncTransport();
@@ -322,9 +322,6 @@ $('barVideo').onclick=toggleVideoPanel;
 $('hideVideo').onclick=toggleVideoPanel;
 $('barQueue').onclick=()=>{
   const opening=$('queuePanel').hidden;
-  if(opening&&window.innerWidth<900&&activeSource==='youtube'){
-    player?.pauseVideo?.(); // Never obscure a playing YouTube iframe behind a queue sheet on phones.
-  }
   $('queuePanel').hidden=!opening;$('queueBackdrop').hidden=!opening;
   $('barQueue').setAttribute('aria-expanded',String(opening));
   if(opening)renderQueue();
