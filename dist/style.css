@@ -361,4 +361,10 @@ dialog .primary{margin-top:8px}
  #catalogCount{flex-basis:100%;text-align:center}
 }
 @media(prefers-reduced-motion:reduce){.catalog-card,.catalog-cover img{transition:none}}
-\n/* Reliable cross-browser touch target for the video hide/show control. */\n#playerPanel .player-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0;position:relative;z-index:3}\n#playerPanel #hideVideo{display:grid;place-items:center;flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:1px solid #78c99a;border-radius:12px;background:#193a27;color:#d8ffe5;font-size:25px;font-weight:700;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent;pointer-events:auto;position:relative;z-index:4}\n#playerPanel #hideVideo:active{background:#2c6240;transform:none}\n#playerPanel #hideVideo:focus-visible{outline:3px solid #a0efb7;outline-offset:2px}\n@media(max-width:600px){#playerPanel .player-heading-actions{gap:6px}#playerPanel #hideVideo{flex-basis:48px;width:48px;min-width:48px;height:48px;min-height:48px;font-size:26px}}\n
+
+/* Reliable cross-browser touch target for the video hide/show control. */
+#playerPanel .player-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0;position:relative;z-index:3}
+#playerPanel #hideVideo{display:grid;place-items:center;flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:1px solid #78c99a;border-radius:12px;background:#193a27;color:#d8ffe5;font-size:25px;font-weight:700;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent;pointer-events:auto;position:relative;z-index:4}
+#playerPanel #hideVideo:active{background:#2c6240;transform:none}
+#playerPanel #hideVideo:focus-visible{outline:3px solid #a0efb7;outline-offset:2px}
+@media(max-width:600px){#playerPanel .player-heading-actions{gap:6px}#playerPanel #hideVideo{flex-basis:48px;width:48px;min-width:48px;height:48px;min-height:48px;font-size:26px}}
