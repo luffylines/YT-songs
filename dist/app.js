@@ -11,6 +11,11 @@ function parseVideo(value) {
 }
 let state = {songs:[], playlists:[]}, view = 'all', query = '', searchResults = null, player = null, pendingVideo = null, selectedSong = null, requestVersion = 0;
 let visibleSongs = [], youtubeQueue = [], priorityQueue = [], queuePosition = -1, activeSource = null, youtubeIsPlaying = false;
+let restoredPlayback = null;
+try{
+  const savedPlayback=JSON.parse(localStorage.getItem('musikero-playback-v1')||'null');
+  if(savedPlayback&&validId(savedPlayback.id)&&typeof savedPlayback.title==='string')restoredPlayback=savedPlayback;
+}catch{}
 // Independent artist streaming stays in memory; never persist provider audio URLs or cache media.
 let catalogQueue = [], catalogPosition = -1;
 // Preserve music collections from older Tambay installations during the Musikero rebrand.
@@ -83,6 +88,15 @@ function clock(seconds){
   if(!Number.isFinite(seconds)||seconds<0)return '0:00';
   const value=Math.floor(seconds);
   return Math.floor(value/60)+':'+String(value%60).padStart(2,'0');
+}
+function persistPlayback(){
+  if(activeSource!=='youtube'||!pendingVideo||!validId(pendingVideo.id))return;
+  let position=0;
+  try{position=Number(player?.getCurrentTime?.())||0;}catch{}
+  try{localStorage.setItem('musikero-playback-v1',JSON.stringify({
+    id:pendingVideo.id,title:pendingVideo.title||'YouTube song',artist:pendingVideo.artist||'YouTube',
+    position,wasPlaying:!!youtubeIsPlaying,updatedAt:Date.now()
+  }));}catch{}
 }
 function syncProgress(){
   let now=0,duration=0;
@@ -179,6 +193,7 @@ function showYoutube(song,autoplay=true){
   $('playingTitle').textContent=song.title;
   $('watchLink').href='https://www.youtube.com/watch?v='+song.id;
   $('playerStatus').textContent='Use the official player controls if your browser does not start playback automatically.';
+  persistPlayback();
   if('mediaSession' in navigator && 'MediaMetadata' in window){
     try{
       navigator.mediaSession.metadata=new MediaMetadata({
@@ -230,7 +245,12 @@ window.onYouTubeIframeAPIReady=()=>{
       onReady:()=>{
         if(activeSource==='youtube'&&pendingVideo){
           if(youtubeIsPlaying) player.playVideo();
-          else player.cueVideoById(pendingVideo.id);
+          else {
+            player.cueVideoById(pendingVideo.id);
+            if(restoredPlayback?.id===pendingVideo.id&&Number(restoredPlayback.position)>0){
+              setTimeout(()=>{try{player.seekTo(Number(restoredPlayback.position),true);}catch{}},500);
+            }
+          }
           $('playerStatus').textContent='Playback is controlled by YouTube and your browser. Background playback availability depends on the device and browser.';
         }else player.pauseVideo();
         syncTransport();
@@ -336,6 +356,8 @@ function toggleVideoPanel(){
 }
 $('barVideo').onclick=toggleVideoPanel;
 $('hideVideo').onclick=toggleVideoPanel;
+$('hideVideo').addEventListener('pointerdown',e=>e.stopPropagation(),{passive:true});
+$('hideVideo').addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
 $('barQueue').onclick=()=>{
   const opening=$('queuePanel').hidden;
   $('queuePanel').hidden=!opening;$('queueBackdrop').hidden=!opening;
@@ -361,7 +383,9 @@ $('seekSlider').oninput=()=>{
 };
 // Do not forcibly pause audio when the page becomes hidden. Browser and
 // operating-system background playback policies still apply.
-setInterval(syncProgress,1000);
+setInterval(()=>{syncProgress();persistPlayback();},2000);
+window.addEventListener('pagehide',persistPlayback);
+window.addEventListener('pageshow',()=>{if(restoredPlayback&&activeSource==='youtube')syncTransport();});
 
 // Play streams directly from the independent music provider. Do not cache or offer downloads.
 function validCatalogStream(url){
@@ -735,6 +759,17 @@ if(partySession){
   $('partyRoom').hidden=true;
 }
 
+if(restoredPlayback){
+  const saved=restoredPlayback;
+  activeSource='youtube';
+  pendingVideo={id:saved.id,title:saved.title,artist:saved.artist||'YouTube'};
+  youtubeQueue=[pendingVideo];queuePosition=0;youtubeIsPlaying=false;
+  $('playerPanel').hidden=true;
+  $('playingTitle').textContent=saved.title;
+  $('watchLink').href='https://www.youtube.com/watch?v='+saved.id;
+  $('playerStatus').textContent='Restored your last song. Press Play to resume; browsers may stop audio when you leave this page.';
+  $('barVideo').textContent='▣ Show video';
+}
 renderLocal();
 render();
 showSectionView();
