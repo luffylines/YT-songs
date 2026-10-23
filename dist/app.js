@@ -244,14 +244,16 @@ window.onYouTubeIframeAPIReady=()=>{
       },
       onReady:()=>{
         if(activeSource==='youtube'&&pendingVideo){
-          if(youtubeIsPlaying) player.playVideo();
-          else {
+          if(youtubeIsPlaying){
+            player.loadVideoById({videoId:pendingVideo.id,startSeconds:restoredPlayback?.id===pendingVideo.id?Math.max(0,Number(restoredPlayback.position)||0):0});
+            $('playerStatus').textContent='Trying to resume your last song. If Chrome blocks autoplay, tap Play once.';
+          }else{
             player.cueVideoById(pendingVideo.id);
             if(restoredPlayback?.id===pendingVideo.id&&Number(restoredPlayback.position)>0){
               setTimeout(()=>{try{player.seekTo(Number(restoredPlayback.position),true);}catch{}},500);
             }
+            $('playerStatus').textContent='Your last song is restored. Tap Play to continue.';
           }
-          $('playerStatus').textContent='Playback is controlled by YouTube and your browser. Background playback availability depends on the device and browser.';
         }else player.pauseVideo();
         syncTransport();
       },
@@ -385,7 +387,19 @@ $('seekSlider').oninput=()=>{
 // operating-system background playback policies still apply.
 setInterval(()=>{syncProgress();persistPlayback();},2000);
 window.addEventListener('pagehide',persistPlayback);
-window.addEventListener('pageshow',()=>{if(restoredPlayback&&activeSource==='youtube')syncTransport();});
+window.addEventListener('pageshow',event=>{
+  if(!restoredPlayback||activeSource!=='youtube')return;
+  syncTransport();
+  if(restoredPlayback.wasPlaying){
+    $('playerStatus').textContent='Trying to resume your last song. If Chrome blocks autoplay, tap Play once.';
+    if(player?.loadVideoById){
+      try{
+        const state=player.getPlayerState?.();
+        if(state!==1&&state!==3)player.loadVideoById({videoId:restoredPlayback.id,startSeconds:Math.max(0,Number(restoredPlayback.position)||0)});
+      }catch{}
+    }
+  }
+});
 
 // Play streams directly from the independent music provider. Do not cache or offer downloads.
 function validCatalogStream(url){
@@ -763,11 +777,13 @@ if(restoredPlayback){
   const saved=restoredPlayback;
   activeSource='youtube';
   pendingVideo={id:saved.id,title:saved.title,artist:saved.artist||'YouTube'};
-  youtubeQueue=[pendingVideo];queuePosition=0;youtubeIsPlaying=false;
+  youtubeQueue=[pendingVideo];queuePosition=0;youtubeIsPlaying=!!saved.wasPlaying;
   $('playerPanel').hidden=true;
   $('playingTitle').textContent=saved.title;
   $('watchLink').href='https://www.youtube.com/watch?v='+saved.id;
-  $('playerStatus').textContent='Restored your last song. Press Play to resume; browsers may stop audio when you leave this page.';
+  $('playerStatus').textContent=saved.wasPlaying
+    ? 'Restored your last song. Trying to resume playback; if Chrome blocks autoplay, tap Play.'
+    : 'Restored your last song. Press Play to resume.';
   $('barVideo').textContent='▣ Show video';
 }
 renderLocal();
