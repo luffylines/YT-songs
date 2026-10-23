@@ -204,9 +204,14 @@ function showYoutube(song,autoplay=true){
   syncTransport();
 }
 function play(song,collection=visibleSongs){
+  if(partySession?.role==='guest'){
+    status('The host controls playback in this Listening Party. Tap 🎉 Party + to add songs to the shared queue.');
+    return;
+  }
   youtubeQueue=Array.from(new Map([...(collection||[]),song].filter(v=>validId(v.id)).map(v=>[v.id,v])).values());
   queuePosition=youtubeQueue.findIndex(v=>v.id===song.id);
   showYoutube(song,true);
+  if(partySession?.role==='host')partyPublishPlayback(true);
 }
 window.onYouTubeIframeAPIReady=()=>{
   apiLoading=false;
@@ -236,7 +241,12 @@ window.onYouTubeIframeAPIReady=()=>{
         }
         if(activeSource==='youtube'){
           youtubeIsPlaying=e.data===1;
-          if(e.data===0){if(!moveQueue(1))youtubeIsPlaying=false;}
+          if(e.data===0){
+            if(partySession?.role==='host')partyAdvanceQueue();
+            else if(!partySession&&!moveQueue(1))youtubeIsPlaying=false;
+          }else if((e.data===1||e.data===2)&&partySession?.role==='host'){
+            partyPublishPlayback(true);
+          }
           syncTransport();
         }
       }
@@ -269,6 +279,10 @@ function moveQueue(delta){
   return false;
 }
 function togglePlayback(){
+  if(partySession?.role==='guest'){
+    status('The host controls playback in this Listening Party.');
+    return;
+  }
   if(activeSource==='youtube'){
     if(!player?.getPlayerState){
       $('playerStatus').textContent='YouTube player is loading. Tap play once it appears.';
@@ -280,6 +294,7 @@ function togglePlayback(){
         player.pauseVideo();
         youtubeIsPlaying=false;
         if('mediaSession' in navigator){try{navigator.mediaSession.playbackState='paused';}catch{}}
+        if(partySession?.role==='host')partyPublishPlayback(true);
       }else{
         player.playVideo();
       }
@@ -551,6 +566,75 @@ async function partyAddSong(song){
     await partyRefresh();
   }catch(e){partyError(e.message);showDialog('partyDialog');}
 }
+let partyLastPublishedKey='';
+let partyApplyingRemote=false;
+let partyRemoteTrack='';
+async function partyPublishPlayback(force=false){
+  if(!partySession||partySession.role!=='host'||activeSource!=='youtube'||!pendingVideo||!player?.getCurrentTime)return;
+  try{
+    const state=player.getPlayerState?.();
+    if(state!==1&&state!==2&&state!==3)return;
+    const position=Math.max(0,Number(player.getCurrentTime())||0);
+    const playing=state===1;
+    const key=[pendingVideo.id,playing,Math.floor(position/4)].join(':');
+    if(!force&&key===partyLastPublishedKey)return;
+    partyLastPublishedKey=key;
+    await partyRequest('playback',{playback:{
+      youtubeId:pendingVideo.id,title:pendingVideo.title,artist:pendingVideo.artist||'YouTube',
+      playing,position,updatedAt:Date.now()
+    }});
+  }catch{}
+}
+async function partyAdvanceQueue(){
+  if(!partySession||partySession.role!=='host')return;
+  try{
+    const result=await partyRequest('start-next');
+    const track=result.playback;
+    if(track?.youtubeId){
+      youtubeQueue=[{id:track.youtubeId,title:track.title,artist:track.artist}];
+      queuePosition=0;
+      showYoutube({id:track.youtubeId,title:track.title,artist:track.artist},true);
+    }else{
+      youtubeIsPlaying=false;
+      partyLastPublishedKey='';
+      syncTransport();
+    }
+    await partyRefresh();
+  }catch(e){partyError(e.message);}
+}
+function partyApplyPlayback(playback){
+  if(!partySession||partySession.role!=='guest'||!playback?.youtubeId)return;
+  const song={id:playback.youtubeId,title:playback.title||'Untitled',artist:playback.artist||'YouTube'};
+  const currentTime=()=>{
+    try{return player?.getCurrentTime?Number(player.getCurrentTime())||0:0;}catch{return 0;}
+  };
+  if(partyRemoteTrack!==song.id){
+    partyRemoteTrack=song.id;
+    partyApplyingRemote=true;
+    youtubeQueue=[song];queuePosition=0;
+    showYoutube(song,false);
+    const apply=()=>{
+      if(!player?.getPlayerState)return;
+      try{
+        const target=Math.max(0,Number(playback.position)||0)+(playback.playing?Math.max(0,(Date.now()-Number(playback.updatedAt||Date.now()))/1000):0);
+        player.seekTo(target,true);
+        if(playback.playing)player.playVideo();else player.pauseVideo();
+        $('partyStatus').textContent='Following host: '+song.title+'. If playback is blocked, tap Play once in the player.';
+      }catch{}
+      partyApplyingRemote=false;
+    };
+    setTimeout(apply,700);
+    return;
+  }
+  if(!player?.getPlayerState)return;
+  try{
+    const target=Math.max(0,Number(playback.position)||0)+(playback.playing?Math.max(0,(Date.now()-Number(playback.updatedAt||Date.now()))/1000):0);
+    if(Math.abs(currentTime()-target)>5)player.seekTo(target,true);
+    const state=player.getPlayerState();
+    if(playback.playing&&state!==1&&state!==3)player.playVideo();
+    if(!playback.playing&&state===1)player.pauseVideo();
+  }catch{}
+}
 function partyRender(data){
   $('partyCodeDisplay').textContent=data.party.code;
   $('partyMemberCount').textContent=(data.members.length)+' member'+(data.members.length===1?'':'s');
@@ -571,16 +655,19 @@ function partyRender(data){
     const row=node('div',undefined,'party-queue-item');
     const thumb=node('img');thumb.src='https://i.ytimg.com/vi/'+track.youtube_id+'/mqdefault.jpg';thumb.alt='';thumb.loading='lazy';
     const copy=node('span',undefined,'party-queue-copy');copy.append(node('strong',track.title),node('small',track.artist+' · added by '+track.added_by));
-    row.append(thumb,copy,button('▶',()=>{
-      const song={id:track.youtube_id,title:track.title,artist:track.artist};
-      if(data.role==='host'){
-        if(!youtubeQueue.some(s=>s.id===song.id))youtubeQueue.push(song);
-        queuePosition=youtubeQueue.findIndex(s=>s.id===song.id);
-        showYoutube(song,true);
-      }else{
-        play(song,[...data.queue.map(q=>({id:q.youtube_id,title:q.title,artist:q.artist})),song]);
-      }
-    },'Play '+track.title));
+    row.append(thumb,copy);
+    if(data.role==='host')row.append(button('▶ Play now',async()=>{
+      try{
+        const result=await partyRequest('start-queued',{queueId:track.id});
+        const current=result.playback;
+        if(current?.youtubeId){
+          youtubeQueue=[{id:current.youtubeId,title:current.title,artist:current.artist}];
+          queuePosition=0;
+          showYoutube({id:current.youtubeId,title:current.title,artist:current.artist},true);
+        }
+        await partyRefresh();
+      }catch(e){partyError(e.message);}
+    },'Play '+track.title+' now'));
     $('partyQueue').append(row);
   });
 }
@@ -589,19 +676,10 @@ async function partyRefresh(){
   partyPollBusy=true;
   try{
     const data=await partyRequest('state');
-    if(partySession.role==='host'){
-      for(const track of data.queue){
-        if(!partySeenQueue.has(track.id)){
-          partySeenQueue.add(track.id);
-          const song={id:track.youtube_id,title:track.title,artist:track.artist};
-          if(activeSource==='youtube'&&pendingVideo?.id!==song.id&&!youtubeQueue.some(s=>s.id===song.id)){
-            priorityQueue.push(song);
-          }
-        }
-      }
-    }else data.queue.forEach(track=>partySeenQueue.add(track.id));
+    data.queue.forEach(track=>partySeenQueue.add(track.id));
     partyRender(data);
-    if(!$('partyDialog').open) $('partyStatus').textContent='Party connected · queue refreshes automatically.';
+    if(partySession.role==='guest')partyApplyPlayback(data.playback);
+    if(!$('partyDialog').open) $('partyStatus').textContent='Party connected · host controls playback · shared queue updates automatically.';
   }catch(e){
     if(/ended|removed|session expired/i.test(e.message)){
       partySetSession(null);partyError(e.message);
@@ -634,7 +712,10 @@ if(partySession){
   $('partyStart').hidden=true;$('partyRoom').hidden=false;
   $('barParty').classList.add('party-active');
   $('barParty').setAttribute('aria-label','Open active listening party');
-  partyPollTimer=setInterval(partyRefresh,4000);
+  partyPollTimer=setInterval(()=>{
+    partyRefresh();
+    if(partySession?.role==='host')partyPublishPlayback(false);
+  },4000);
   window.addEventListener('storage',e=>{if(e.key==='musikero-party-session'&&!e.newValue)partySetSession(null);});
   setTimeout(partyRefresh,500);
 }else{
