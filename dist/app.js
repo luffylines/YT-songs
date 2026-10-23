@@ -595,6 +595,8 @@ async function partyAdvanceQueue(){
       queuePosition=0;
       showYoutube({id:track.youtubeId,title:track.title,artist:track.artist},true);
     }else{
+      try{await partyRequest('playback',{playback:{youtubeId:null,title:'',artist:'',playing:false,position:0,updatedAt:Date.now()}});}catch{}
+      partyRemoteTrack='';
       youtubeIsPlaying=false;
       partyLastPublishedKey='';
       syncTransport();
@@ -603,7 +605,17 @@ async function partyAdvanceQueue(){
   }catch(e){partyError(e.message);}
 }
 function partyApplyPlayback(playback){
-  if(!partySession||partySession.role!=='guest'||!playback?.youtubeId)return;
+  if(!partySession||partySession.role!=='guest')return;
+  if(!playback?.youtubeId){
+    if(partyRemoteTrack){
+      partyRemoteTrack='';
+      try{player?.pauseVideo?.();}catch{}
+      youtubeIsPlaying=false;
+      $('partyStatus').textContent='The host is not playing a song right now.';
+      syncTransport();
+    }
+    return;
+  }
   const song={id:playback.youtubeId,title:playback.title||'Untitled',artist:playback.artist||'YouTube'};
   const currentTime=()=>{
     try{return player?.getCurrentTime?Number(player.getCurrentTime())||0:0;}catch{return 0;}
@@ -613,6 +625,7 @@ function partyApplyPlayback(playback){
     partyApplyingRemote=true;
     youtubeQueue=[song];queuePosition=0;
     showYoutube(song,false);
+    youtubeIsPlaying=!!playback.playing;
     const apply=()=>{
       if(!player?.getPlayerState)return;
       try{
