@@ -254,6 +254,30 @@ assert.deepEqual(Array.from(makeCatalogQueue(independent[1],independent),track=>
 assert.match(source,/audio\.addEventListener\('ended',\(\)=>\{if\(!moveQueue\(1\)\)syncTransport\(\);\}\);/);
 console.log('PASS: independent tracks rotate from selected song and keep an ended-event nexttrack handler');
 
+// Backgrounded iOS pages must not try to start the next YouTube video.
+// When the tab is visible again, reconcile an ended queue item at most once.
+const visibleRecovery=source.slice(source.indexOf('let youtubeForegroundRecoveryKey=null;'),source.indexOf('// Play streams directly from the independent music provider.'));
+assert.match(visibleRecovery,/function reconcileVisiblePlayback\(\)/);
+function testVisibilityRecovery(hidden,{sourceType='youtube',native=true}={}){
+  return vm.runInNewContext(`(()=>{
+    let activeSource='${sourceType}',youtubeNativePlaylist=${native},queuePosition=0,youtubeCurrentStarted=true,partySession=null;
+    let pendingVideo={id:'aaaaaaaaaaa',title:'First'},youtubeQueue=[pendingVideo,{id:'bbbbbbbbbbb',title:'Second'}];
+    let next=0,moved=0,synced=0;
+    const player={getPlayerState:()=>0,getPlaylistIndex:()=>0,nextVideo:()=>{next++;}};
+    const audio={ended:true},document={hidden:${hidden},addEventListener(){}},window={addEventListener(){}};
+    const $=()=>({textContent:'',href:''}),syncTransport=()=>{synced++;},moveQueue=()=>{moved++;return true;};
+    ${visibleRecovery}
+    reconcileVisiblePlayback();reconcileVisiblePlayback();
+    return {next,moved,synced};
+  })()`);
+}
+assert.equal(testVisibilityRecovery(true).next,0,'no YouTube player commands while hidden');
+assert.equal(testVisibilityRecovery(false).next,1,'foreground recovery should not skip twice');
+assert.equal(testVisibilityRecovery(false,{native:false}).moved,1,'non-playlist queued item recovers on foreground');
+assert.equal(testVisibilityRecovery(true,{sourceType:'local'}).moved,0);
+assert.equal(testVisibilityRecovery(false,{sourceType:'local'}).moved,2); // mocked audio remains ended; real moveQueue changes its source
+console.log('PASS: recovery of queued tracks only after iOS web page becomes visible');
+
 const catalogScript=fs.readFileSync('dist/catalog.js','utf8');
 const catalogApi=fs.readFileSync('api/catalog.js','utf8');
 const shell=fs.readFileSync('dist/sw.js','utf8');
