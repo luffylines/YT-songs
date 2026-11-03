@@ -274,6 +274,7 @@ function handleYoutubeStateChange(e){
     youtubeIsPlaying=true;
     youtubeCurrentStarted=true;
     youtubeAutoplayRequested=false;
+    youtubeForegroundRecoveryKey=null;
     if(youtubeNativePlaylist&&typeof player?.getPlaylistIndex==='function'){
       const nextIndex=Number(player.getPlaylistIndex());
       if(Number.isInteger(nextIndex)&&nextIndex>=0&&nextIndex<youtubeQueue.length&&nextIndex!==queuePosition){
@@ -468,19 +469,48 @@ $('seekSlider').oninput=()=>{
 // operating-system background playback policies still apply.
 setInterval(()=>{syncProgress();persistPlayback();},2000);
 window.addEventListener('pagehide',persistPlayback);
-window.addEventListener('pageshow',event=>{
-  if(!restoredPlayback||activeSource!=='youtube')return;
-  syncTransport();
-  if(restoredPlayback.wasPlaying){
-    $('playerStatus').textContent='Trying to resume your last song. If Chrome blocks autoplay, tap Play once.';
-    if(player?.loadVideoById){
-      try{
-        const state=player.getPlayerState?.();
-        if(state!==1&&state!==3)player.loadVideoById({videoId:restoredPlayback.id,startSeconds:Math.max(0,Number(restoredPlayback.position)||0)});
-      }catch{}
-    }
+
+// iOS may suspend end-of-track JavaScript when Brave/Safari is backgrounded.
+// Recover only after Musikero becomes visible; do not try to run a YouTube
+// embed as a background player or bypass browser/YouTube playback policies.
+let youtubeForegroundRecoveryKey=null;
+function reconcileVisiblePlayback(){
+  if(document.hidden)return;
+  if(activeSource==='youtube'&&player?.getPlayerState){
+    try{
+      const playerState=player.getPlayerState();
+      if(youtubeNativePlaylist&&typeof player.getPlaylistIndex==='function'){
+        const index=Number(player.getPlaylistIndex());
+        if(Number.isInteger(index)&&index>=0&&index<youtubeQueue.length&&queuePosition!==index){
+          queuePosition=index;
+          pendingVideo=youtubeQueue[index];
+          $('playingTitle').textContent=pendingVideo.title;
+          $('watchLink').href='https://www.youtube.com/watch?v='+pendingVideo.id;
+        }
+      }
+      if(playerState===0&&!partySession&&pendingVideo&&youtubeForegroundRecoveryKey!==pendingVideo.id){
+        // A song finished while the page was suspended: try its next item
+        // now that the user has returned to the visible page.
+        youtubeForegroundRecoveryKey=pendingVideo.id;
+        if(youtubeNativePlaylist&&queuePosition+1<youtubeQueue.length&&typeof player.nextVideo==='function'){
+          player.nextVideo();
+          $('playerStatus').textContent='Continuing the queue now that Musikero is visible. Tap Play if your browser blocks it.';
+        }else if(!youtubeNativePlaylist&&youtubeCurrentStarted){
+          youtubeCurrentStarted=false;
+          if(!moveQueue(1))$('playerStatus').textContent='End of queue.';
+        }
+      }
+      syncTransport();
+    }catch{}
+  }else if((activeSource==='local'||activeSource==='catalog')&&audio.ended){
+    // For music the user owns or that is licensed, an ended event may have
+    // been suspended while the phone was locked.
+    if(!moveQueue(1))syncTransport();
   }
-});
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconcileVisiblePlayback();});
+window.addEventListener('focus',reconcileVisiblePlayback);
+window.addEventListener('pageshow',()=>{syncTransport();reconcileVisiblePlayback();});
 
 // Play streams directly from the independent music provider. Do not cache or offer downloads.
 function validCatalogStream(url){
