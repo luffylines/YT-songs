@@ -132,7 +132,7 @@ console.log('PASS: selected video starts a continuous deduplicated queue, includ
 const mover=source.slice(source.indexOf('function moveQueue(delta)'),source.indexOf('function togglePlayback()'));
 assert.ok(mover.startsWith('function moveQueue(delta)'),'Queue movement handler missing');
 const moves=vm.runInNewContext(`(()=>{
- let activeSource='youtube',queuePosition=0,youtubeQueue=[{id:'first'},{id:'second'}],localTracks=[],activeAudio=-1;
+ let activeSource='youtube',queuePosition=0,youtubeQueue=[{id:'first'},{id:'second'}],priorityQueue=[],catalogQueue=[],catalogPosition=-1,localTracks=[],activeAudio=-1;
  let history=[],showYoutube=(song)=>history.push(song.id),playLocal=()=>{};
  ${mover}
  return {next:moveQueue(1),pastEnd:moveQueue(1),prev:moveQueue(-1),pastStart:moveQueue(-1),history,queuePosition};
