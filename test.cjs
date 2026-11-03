@@ -170,6 +170,18 @@ const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
 assert.equal(ids.length,new Set(ids).size,'duplicate HTML ID');
 console.log('PASS: Musikero branding, luxury 3D design, mobile accessibility and saved-playlist migration');
 
+// Independently licensed audio uses an HTMLAudioElement so onended can trigger nexttrack.
+const catalogQueueBuilder=source.slice(source.indexOf('function buildCatalogQueue(track,items)'),source.indexOf('window.MusikeroAudio=Object.freeze'));
+assert.match(catalogQueueBuilder,/function buildCatalogQueue/);
+const makeCatalogQueue=vm.runInNewContext(catalogQueueBuilder+'\n buildCatalogQueue',{
+  validCatalogStream:url=>typeof url==='string'&&url.startsWith('https://prod-1.storage.jamendo.com/')
+});
+const independent=['jm-1','jm-2','jm-3'].map(id=>({id,title:id,audio:'https://prod-1.storage.jamendo.com/'+id+'.mp3'}));
+assert.deepEqual(Array.from(makeCatalogQueue(independent[2],independent),track=>track.id),['jm-3','jm-1','jm-2']);
+assert.deepEqual(Array.from(makeCatalogQueue(independent[1],independent),track=>track.id),['jm-2','jm-3','jm-1']);
+assert.match(source,/audio\.addEventListener\('ended',\(\)=>\{if\(!moveQueue\(1\)\)syncTransport\(\);\}\);/);
+console.log('PASS: independent tracks rotate from selected song and keep an ended-event nexttrack handler');
+
 const catalogScript=fs.readFileSync('dist/catalog.js','utf8');
 const catalogApi=fs.readFileSync('api/catalog.js','utf8');
 const shell=fs.readFileSync('dist/sw.js','utf8');
