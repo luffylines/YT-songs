@@ -12,7 +12,7 @@ function parseVideo(value) {
 let state = {songs:[], playlists:[]}, view = 'all', query = '', searchResults = null, player = null, pendingVideo = null, selectedSong = null, requestVersion = 0;
 let visibleSongs = [], youtubeQueue = [], priorityQueue = [], queuePosition = -1, activeSource = null, youtubeIsPlaying = false;
 // Track an actual playback start so a stale ENDED event cannot skip multiple songs.
-let youtubeAutoplayRequested = false, youtubeCurrentStarted = false;
+let youtubeAutoplayRequested = false, youtubeCurrentStarted = false, youtubeNativePlaylist = false;
 let restoredPlayback = null;
 try{
   const savedPlayback=JSON.parse(localStorage.getItem('musikero-playback-v1')||'null');
@@ -183,9 +183,28 @@ function closeQueue(){
 function enqueueNext(song){
   if(!validId(song?.id))return;
   priorityQueue=priorityQueue.filter(item=>item.id!==song.id);
-  priorityQueue.unshift(song);
+  if(activeSource==='youtube'&&youtubeNativePlaylist&&pendingVideo&&song.id!==pendingVideo.id){
+    // Keep Play next inside the native YouTube playlist, retaining playhead position.
+    const currentTime=Number(player?.getCurrentTime?.())||0;
+    youtubeQueue=youtubeQueue.filter(item=>item.id!==song.id);
+    queuePosition=youtubeQueue.findIndex(item=>item.id===pendingVideo.id);
+    youtubeQueue.splice(queuePosition+1,0,song);
+    if(youtubeIsPlaying)player.loadPlaylist(youtubeQueue.map(item=>item.id),queuePosition,currentTime);
+    else player.cuePlaylist(youtubeQueue.map(item=>item.id),queuePosition,currentTime);
+  }else priorityQueue.unshift(song);
   status('Added to play next: '+song.title);
   syncTransport();
+}
+// Keep a multi-song queue inside YouTube's visible, official iframe player.
+// Native playlist transitions are less dependent on new scripted autoplay gestures.
+function loadYoutubeSelection(song,autoplay=true){
+  youtubeNativePlaylist=!partySession && youtubeQueue.length>1 && typeof player?.loadPlaylist==='function';
+  if(youtubeNativePlaylist){
+    const ids=youtubeQueue.map(item=>item.id);
+    if(autoplay)player.loadPlaylist(ids,queuePosition,0);
+    else player.cuePlaylist(ids,queuePosition,0);
+  }else if(autoplay)player.loadVideoById(song.id);
+  else player.cueVideoById(song.id);
 }
 function showYoutube(song,autoplay=true){
   if(!validId(song?.id))return;
@@ -211,8 +230,7 @@ function showYoutube(song,autoplay=true){
     }catch{}
   }
   if(player?.loadVideoById){
-    if(autoplay)player.loadVideoById(song.id);
-    else player.cueVideoById(song.id);
+    loadYoutubeSelection(song,autoplay);
   }else if(!apiLoading){
     apiLoading=true;
     const script=node('script');
@@ -250,6 +268,19 @@ function handleYoutubeStateChange(e){
     youtubeIsPlaying=true;
     youtubeCurrentStarted=true;
     youtubeAutoplayRequested=false;
+    if(youtubeNativePlaylist&&typeof player?.getPlaylistIndex==='function'){
+      const nextIndex=Number(player.getPlaylistIndex());
+      if(Number.isInteger(nextIndex)&&nextIndex>=0&&nextIndex<youtubeQueue.length&&nextIndex!==queuePosition){
+        queuePosition=nextIndex;
+        pendingVideo=youtubeQueue[nextIndex];
+        $('playingTitle').textContent=pendingVideo.title;
+        $('watchLink').href='https://www.youtube.com/watch?v='+pendingVideo.id;
+        persistPlayback();
+        if('mediaSession' in navigator&&'MediaMetadata' in window){
+          try{navigator.mediaSession.metadata=new MediaMetadata({title:pendingVideo.title,artist:pendingVideo.artist||'YouTube',album:'Musikero · YouTube',artwork:[{src:'https://i.ytimg.com/vi/'+pendingVideo.id+'/hqdefault.jpg',sizes:'480x360',type:'image/jpeg'}]});}catch{}
+        }
+      }
+    }
   }else if(e.data===0){
     youtubeIsPlaying=false;
     // An old video's ENDED event can arrive after a new video was requested.
@@ -257,7 +288,11 @@ function handleYoutubeStateChange(e){
     if(youtubeCurrentStarted){
       youtubeCurrentStarted=false;
       if(partySession?.role==='host')partyAdvanceQueue();
-      else if(!partySession && !moveQueue(1)){
+      else if(youtubeNativePlaylist){
+        // YouTube advances internally; do NOT issue another loadVideoById here.
+        if(queuePosition===youtubeQueue.length-1)
+          $('playerStatus').textContent='End of queue. Choose more songs to continue listening.';
+      }else if(!partySession && !moveQueue(1)){
         $('playerStatus').textContent='End of queue. Choose more songs to continue listening.';
       }
     }
@@ -281,17 +316,19 @@ window.onYouTubeIframeAPIReady=()=>{
           ? 'This video is restricted from embedded playback. Skipping to the next queued song when available.'
           : 'This video cannot play in the embedded player. Skipping to the next queued song when available.';
         youtubeCurrentStarted=false;
-        if(!moveQueue(1))status('Could not play this YouTube video. Try another song or choose Independent Music.');
+        if(youtubeNativePlaylist&&typeof player?.nextVideo==='function'&&queuePosition+1<youtubeQueue.length){
+          player.nextVideo();
+        }else if(!moveQueue(1))status('Could not play this YouTube video. Try another song or choose Independent Music.');
       },
       onReady:()=>{
         if(activeSource==='youtube'&&pendingVideo){
           if(youtubeAutoplayRequested){
             // A click before the iframe is ready must still start playback.
             // cueVideoById only prepares the video and does NOT play it.
-            player.loadVideoById(pendingVideo.id);
+            loadYoutubeSelection(pendingVideo,true);
             $('playerStatus').textContent='Starting your selected song. If autoplay is blocked, tap Play in the visible YouTube player.';
           }else{
-            player.cueVideoById(pendingVideo.id);
+            loadYoutubeSelection(pendingVideo,false);
             if(restoredPlayback?.id===pendingVideo.id&&Number(restoredPlayback.position)>0){
               setTimeout(()=>{try{player.seekTo(Number(restoredPlayback.position),true);}catch{}},500);
             }
