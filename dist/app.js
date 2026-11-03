@@ -435,17 +435,26 @@ function playCatalogAt(index){
       navigator.mediaSession.setActionHandler('seekto',e=>{if(Number.isFinite(e.seekTime))audio.currentTime=e.seekTime;});
     }catch{}
   }
-  audio.play().catch(()=>status('Tap Play in the bottom bar to start independent music.'));
+  audio.play().catch(()=>status(document.hidden?'Background playback was blocked by your browser. Unlock your phone and tap Play.':'Tap Play in the bottom bar to start independent music.'));
   syncTransport();
+}
+function buildCatalogQueue(track,items){
+  if(!track?.id?.startsWith('jm-')||!validCatalogStream(track.audio))return [];
+  const unique=new Map();
+  for(const item of Array.isArray(items)?items:[]){
+    if(item?.id?.startsWith('jm-')&&validCatalogStream(item.audio))unique.set(item.id,item);
+  }
+  unique.set(track.id,track);
+  const tracks=Array.from(unique.values());
+  const selected=tracks.findIndex(item=>item.id===track.id);
+  return [...tracks.slice(selected),...tracks.slice(0,selected)];
 }
 window.MusikeroAudio=Object.freeze({
   play(track,items){
     if(!track||!Array.isArray(items))return;
-    const unique=new Map();
-    for(const item of items){if(item?.id?.startsWith('jm-')&&validCatalogStream(item.audio))unique.set(item.id,item);}
-    if(validCatalogStream(track.audio))unique.set(track.id,track);
-    catalogQueue=Array.from(unique.values());
-    catalogPosition=catalogQueue.findIndex(item=>item.id===track.id);
+    catalogQueue=buildCatalogQueue(track,items);
+    if(!catalogQueue.length)return;
+    catalogPosition=0;
     playCatalogAt(catalogPosition);
   },
   isCurrent(id){return activeSource==='catalog'&&catalogQueue[catalogPosition]?.id===id;},
@@ -535,7 +544,7 @@ function playLocal(i){
   $('playerPanel').hidden=true;
   activeSource='local';activeAudio=i;youtubeIsPlaying=false;
   if(audio.src!==track.url)audio.src=track.url;
-  audio.play().catch(()=>status('Tap play again to start your own audio.'));
+  audio.play().catch(()=>status(document.hidden?'Background playback was blocked by your browser. Unlock your phone and tap Play.':'Tap play again to start your own audio.'));
   if('mediaSession' in navigator && 'MediaMetadata' in window){
     try{
       navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:'My audio · Musikero'});
@@ -547,6 +556,7 @@ function playLocal(i){
   }
   syncTransport();
 }
+// Native audio can advance from the media ended event without a visible tab, when the OS allows it.
 audio.addEventListener('ended',()=>{if(!moveQueue(1))syncTransport();});
 audio.addEventListener('error',()=>status('This audio format may not be supported by your browser.'));
 for(const event of ['play','pause','loadedmetadata','durationchange','timeupdate']){
