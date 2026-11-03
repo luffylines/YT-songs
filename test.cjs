@@ -235,7 +235,7 @@ assert.match(styles,/rotateY\(-20deg\)/);
 assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
 assert.match(styles,/@media\(max-width:700px\)/);
 assert.match(icon,/<title id="title">Musikero<\/title>/);
-assert.match(sw,/musikero-shell-v7/);
+assert.match(sw,/musikero-shell-v8/);
 assert.match(source,/getItem\('musikero-v1'\) \|\| localStorage\.getItem\('tambay-v1'\)/);
 assert.match(source,/setItem\('musikero-v1'/);
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
@@ -265,7 +265,7 @@ function testVisibilityRecovery(hidden,{sourceType='youtube',native=true}={}){
     let next=0,moved=0,synced=0;
     const player={getPlayerState:()=>0,getPlaylistIndex:()=>0,nextVideo:()=>{next++;}};
     const audio={ended:true},document={hidden:${hidden},addEventListener(){}},window={addEventListener(){}};
-    const $=()=>({textContent:'',href:''}),syncTransport=()=>{synced++;},moveQueue=()=>{moved++;return true;};
+    const $=()=>({textContent:'',href:''}),syncTransport=()=>{synced++;},moveQueue=()=>{moved++;audio.ended=false;return true;};
     ${visibleRecovery}
     reconcileVisiblePlayback();reconcileVisiblePlayback();
     return {next,moved,synced};
@@ -275,7 +275,7 @@ assert.equal(testVisibilityRecovery(true).next,0,'no YouTube player commands whi
 assert.equal(testVisibilityRecovery(false).next,1,'foreground recovery should not skip twice');
 assert.equal(testVisibilityRecovery(false,{native:false}).moved,1,'non-playlist queued item recovers on foreground');
 assert.equal(testVisibilityRecovery(true,{sourceType:'local'}).moved,0);
-assert.equal(testVisibilityRecovery(false,{sourceType:'local'}).moved,2); // mocked audio remains ended; real moveQueue changes its source
+assert.equal(testVisibilityRecovery(false,{sourceType:'local'}).moved,1);
 console.log('PASS: recovery of queued tracks only after iOS web page becomes visible');
 
 const catalogScript=fs.readFileSync('dist/catalog.js','utf8');
