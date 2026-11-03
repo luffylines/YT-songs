@@ -173,7 +173,7 @@ const tracks=['aaaaaaaaaaa','bbbbbbbbbbb','ccccccccccc'].map(id=>({id,title:id})
 assert.deepEqual(Array.from(createQueue(tracks[2],tracks),track=>track.id),[tracks[2].id,tracks[0].id,tracks[1].id], 'last search result must still have next tracks');
 assert.deepEqual(Array.from(createQueue(tracks[1],tracks),track=>track.id),[tracks[1].id,tracks[2].id,tracks[0].id]);
 assert.deepEqual(Array.from(createQueue(tracks[0],[tracks[0],tracks[0],tracks[1]]),track=>track.id),[tracks[0].id,tracks[1].id]);
-assert.match(source,/if\(e.data===0\)/, 'YouTube ended event must advance the queue');
+assert.match(source,/e\.data===0/, 'YouTube ended event must advance the queue');
 console.log('PASS: selected video starts a continuous deduplicated queue, including the last search result');
 const mover=source.slice(source.indexOf('function moveQueue(delta)'),source.indexOf('function togglePlayback()'));
 assert.ok(mover.startsWith('function moveQueue(delta)'),'Queue movement handler missing');
@@ -209,7 +209,7 @@ assert.match(styles,/rotateY\(-20deg\)/);
 assert.match(styles,/@media\(prefers-reduced-motion:reduce\)/);
 assert.match(styles,/@media\(max-width:700px\)/);
 assert.match(icon,/<title id="title">Musikero<\/title>/);
-assert.match(sw,/musikero-shell-v5/);
+assert.match(sw,/musikero-shell-v6/);
 assert.match(source,/getItem\('musikero-v1'\) \|\| localStorage\.getItem\('tambay-v1'\)/);
 assert.match(source,/setItem\('musikero-v1'/);
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);
