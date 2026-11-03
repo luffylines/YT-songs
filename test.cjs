@@ -115,7 +115,7 @@ assert.match(source,/function syncTransport\(\)/);
 assert.match(source,/function renderQueue\(\)/);
 assert.match(source,/function showYoutube\(song,autoplay=true\)/);
 assert.match(source,/playerVars:\{playsinline:1,origin:location.origin,controls:1\}/);
-assert.match(source,/if\(document.hidden&&activeSource==='youtube'\)player\?\.pauseVideo/);
+assert.match(source,/onStateChange:e=>/);
 assert.match(styles,/\.bottom-player\{position:fixed/);
 assert.match(styles,/#player\{height:230px;min-height:200px/);
 assert.match(styles,/@media\(max-width:700px\)/);
