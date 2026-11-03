@@ -255,6 +255,12 @@ function play(song,collection=visibleSongs){
   // Begin at the selected song, then continue through the remaining search results.
   // Wrapping the initial list prevents selecting its last result from ending the queue immediately.
   youtubeQueue=buildYoutubeQueue(song,collection);
+  if(priorityQueue.length){
+    const queued=Array.from(new Map(priorityQueue.filter(item=>validId(item?.id)&&item.id!==song.id).map(item=>[item.id,item])).values());
+    const queuedIds=new Set(queued.map(item=>item.id));
+    youtubeQueue=[youtubeQueue[0],...queued,...youtubeQueue.slice(1).filter(item=>!queuedIds.has(item.id))];
+    priorityQueue=[];
+  }
   queuePosition=0;
   showYoutube(song,true);
   if(partySession?.role==='host')partyPublishPlayback(true);
