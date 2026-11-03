@@ -218,13 +218,22 @@ function showYoutube(song,autoplay=true){
   }
   syncTransport();
 }
+function buildYoutubeQueue(song,collection){
+  if(!validId(song?.id))return [];
+  const unique=Array.from(new Map([...(Array.isArray(collection)?collection:[]),song]
+    .filter(item=>validId(item?.id)).map(item=>[item.id,item])).values());
+  const selected=unique.findIndex(item=>item.id===song.id);
+  return [...unique.slice(selected),...unique.slice(0,selected)];
+}
 function play(song,collection=visibleSongs){
   if(partySession?.role==='guest'){
     status('The host controls playback in this Listening Party. Tap 🎉 Party + to add songs to the shared queue.');
     return;
   }
-  youtubeQueue=Array.from(new Map([...(collection||[]),song].filter(v=>validId(v.id)).map(v=>[v.id,v])).values());
-  queuePosition=youtubeQueue.findIndex(v=>v.id===song.id);
+  // Begin at the selected song, then continue through the remaining search results.
+  // Wrapping the initial list prevents selecting its last result from ending the queue immediately.
+  youtubeQueue=buildYoutubeQueue(song,collection);
+  queuePosition=0;
   showYoutube(song,true);
   if(partySession?.role==='host')partyPublishPlayback(true);
 }
