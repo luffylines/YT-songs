@@ -115,11 +115,57 @@ assert.match(source,/function syncTransport\(\)/);
 assert.match(source,/function renderQueue\(\)/);
 assert.match(source,/function showYoutube\(song,autoplay=true\)/);
 assert.match(source,/playerVars:\{playsinline:1,origin:location.origin,controls:1\}/);
-assert.match(source,/onStateChange:e=>/);
+assert.match(source,/onStateChange:handleYoutubeStateChange/);
+assert.match(source,/onAutoplayBlocked:/, 'YouTube autoplay restrictions must be shown to the user');
 assert.match(styles,/\.bottom-player\{position:fixed/);
 assert.match(styles,/#player\{height:230px;min-height:200px/);
 assert.match(styles,/@media\(max-width:700px\)/);
 assert.doesNotMatch(source,/audioPanel|closePlayer|nextAudio|prevAudio/);
+// Simulate iframe callback lifecycle: PLAYING -> ENDED should advance exactly once.
+const endedHandler=source.slice(source.indexOf('function handleYoutubeStateChange(e)'),source.indexOf('window.onYouTubeIframeAPIReady=()=>'));
+assert.ok(endedHandler.startsWith('function handleYoutubeStateChange(e)'));
+const lifecycle=vm.runInNewContext(`(()=>{
+  let activeSource='youtube',youtubeIsPlaying=false,youtubeCurrentStarted=false,youtubeAutoplayRequested=true;
+  let partySession=null,advanced=0,synced=0;
+  const player={pauseVideo(){}},moveQueue=()=>{advanced++;return true;},syncTransport=()=>{synced++;};
+  const $=()=>({textContent:''});
+  ${endedHandler}
+  handleYoutubeStateChange({data:0}); // stale ENDED without PLAYING
+  const stale=advanced;
+  handleYoutubeStateChange({data:1});
+  handleYoutubeStateChange({data:0});
+  handleYoutubeStateChange({data:0}); // repeated ENDED must not skip another song
+  const once=advanced;
+  handleYoutubeStateChange({data:1});
+  handleYoutubeStateChange({data:0});
+  return {stale,once,twice:advanced,synced};
+})()`);
+assert.equal(lifecycle.stale,0);
+assert.equal(lifecycle.once,1);
+assert.equal(lifecycle.twice,2);
+assert.ok(lifecycle.synced>=3);
+// A user click while the iframe API is still loading must load and PLAY the video, not only cue it.
+const youtubeFactory=source.slice(source.indexOf('window.onYouTubeIframeAPIReady=()=>'),source.indexOf('function moveQueue(delta)'));
+function testIframeReady(autoplay){
+  return vm.runInNewContext(`(()=>{
+    let apiLoading=true,player=null,activeSource='youtube',youtubeAutoplayRequested=${autoplay},youtubeIsPlaying=false;
+    const calls=[],pendingVideo={id:'aaaaaaaaaaa'},restoredPlayback=null;
+    const location={origin:'https://example.org'},window={},syncTransport=()=>{},setTimeout=()=>{};
+    const $=()=>({textContent:''}),handleYoutubeStateChange=()=>{},status=()=>{},moveQueue=()=>false;
+    const YT={Player:function(id,options){
+      this.loadVideoById=id=>calls.push('load:'+id);
+      this.cueVideoById=id=>calls.push('cue:'+id);
+      this.pauseVideo=()=>{};
+      this.events=options.events;
+    }};
+    ${youtubeFactory}
+    window.onYouTubeIframeAPIReady();player.events.onReady();return calls;
+  })()`);
+}
+assert.deepEqual(Array.from(testIframeReady(true)),['load:aaaaaaaaaaa']);
+assert.deepEqual(Array.from(testIframeReady(false)),['cue:aaaaaaaaaaa']);
+console.log('PASS: YouTube iframe plays first click and ENDED advances one queued track per song');
+
 const queueBuilder=source.slice(source.indexOf('function buildYoutubeQueue(song,collection)'),source.indexOf('function play(song,collection=visibleSongs)'));
 assert.match(queueBuilder,/function buildYoutubeQueue/);
 const createQueue=vm.runInNewContext(queueBuilder+'\n buildYoutubeQueue',{validId:id=>typeof id==='string' && /^[A-Za-z0-9_-]{11}$/.test(id)});
