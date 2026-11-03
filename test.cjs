@@ -173,6 +173,24 @@ assert.deepEqual(Array.from(testIframeReady(false)),['cue:aaaaaaaaaaa']);
 assert.deepEqual(Array.from(testIframeReady(true,3)),['playlist:aaaaaaaaaaa,bbbbbbbbbbb,ccccccccccc:0']);
 assert.deepEqual(Array.from(testIframeReady(false,3)),['cueplaylist:aaaaaaaaaaa,bbbbbbbbbbb,ccccccccccc:0']);
 console.log('PASS: first-click playback, duplicate ENDED guard and official YouTube playlist queue');
+const nativeProgression=vm.runInNewContext(`(()=>{
+  let activeSource='youtube',youtubeIsPlaying=false,youtubeCurrentStarted=false,youtubeAutoplayRequested=true,youtubeNativePlaylist=true;
+  let queuePosition=0,pendingVideo={id:'aaaaaaaaaaa',title:'First'},partySession=null,advanced=0;
+  const youtubeQueue=[pendingVideo,{id:'bbbbbbbbbbb',title:'Second'}];
+  const player={getPlaylistIndex:()=>1,pauseVideo(){}},navigator={},window={};
+  const $=()=>({textContent:'',href:''}),persistPlayback=()=>{},syncTransport=()=>{};
+  const moveQueue=()=>{advanced++;return true;};
+  ${endedHandler}
+  handleYoutubeStateChange({data:1}); // The YouTube iframe has switched internally.
+  const now={position:queuePosition,id:pendingVideo.id};
+  handleYoutubeStateChange({data:0}); // Native playlist must NOT advance again.
+  return {...now,advanced};
+})()`);
+assert.equal(nativeProgression.position,1);
+assert.equal(nativeProgression.id,'bbbbbbbbbbb');
+assert.equal(nativeProgression.advanced,0);
+console.log('PASS: YouTube native playlist transitions synchronize song metadata without double skipping');
+
 
 const queueBuilder=source.slice(source.indexOf('function buildYoutubeQueue(song,collection)'),source.indexOf('function play(song,collection=visibleSongs)'));
 assert.match(queueBuilder,/function buildYoutubeQueue/);
